@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2023 INRIA
+ * Copyright (C) 2023 Sebastiano Vigna
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR Apache-2.0
+ */
+
 /*!
 A tunable progress logger to log progress information about long-running activities.
 It is a port of the Java class [`it.unimi.dsi.util.ProgressLogger`](https://dsiutils.di.unimi.it/docs/it/unimi/dsi/logging/ProgressLogger.html)

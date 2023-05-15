@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2023 INRIA
+ * Copyright (C) 2023 Sebastiano Vigna
+ *
+ * SPDX-License-Identifier: LGPL-2.1-or-later OR Apache-2.0
+ */
+
 use dsi_progress_logger::ProgressLogger;
 use log::info;
 use std::thread;
