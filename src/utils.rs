@@ -33,7 +33,7 @@ impl TimeUnit {
         }
     }
 
-    pub fn to_seconds(&self) -> f64 {
+    pub fn as_seconds(&self) -> f64 {
         match self {
             TimeUnit::NanoSeconds => 1.0e-9,
             TimeUnit::MicroSeconds => 1.0e-6,
@@ -47,7 +47,7 @@ impl TimeUnit {
 
     pub fn nice_time_unit(seconds: f64) -> Self {
         for unit in TimeUnit::VALUES.iter().rev() {
-            if seconds >= unit.to_seconds() {
+            if seconds >= unit.as_seconds() {
                 return *unit;
             }
         }
@@ -56,7 +56,7 @@ impl TimeUnit {
 
     pub fn nice_speed_unit(seconds: f64) -> Self {
         for unit in TimeUnit::VALUES[3..].iter() {
-            if seconds <= unit.to_seconds() {
+            if seconds <= unit.as_seconds() {
                 return *unit;
             }
         }
@@ -73,7 +73,7 @@ impl TimeUnit {
         let mut seconds = milliseconds / 1000;
 
         for unit in [TimeUnit::Days, TimeUnit::Hours, TimeUnit::Minutes] {
-            let to_seconds = unit.to_seconds() as u128;
+            let to_seconds = unit.as_seconds() as u128;
             if seconds >= to_seconds {
                 result.push_str(&format!("{}{} ", seconds / to_seconds, unit.label(),));
                 seconds %= to_seconds;
@@ -95,7 +95,7 @@ pub fn scale(mut val: f64) -> (f64, &'static str) {
         val /= 1000.0;
     }
 
-    return (val, "Y");
+    (val, "Y")
 }
 
 pub fn humanize(val: f64) -> String {
