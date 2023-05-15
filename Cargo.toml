@@ -1,0 +1,17 @@
+[package]
+name = "dsi-progress-logger"
+version = "0.1.0"
+edition = "2021"
+description = "A Rust port of the ProgressLogger class from the DSI Utilities"
+repository = "https://github.com/vigna/dsi-progress-logger-rs/"
+license = "Apache-2.0 OR LGPL-2.1-or-later"
+keywords = ["log", "progress"]
+
+[dependencies]
+log = "0.4.17"
+num-format = "0.4.4"
+pluralizer = "0.4.0"
+sysinfo = "0.29.0"
+
+[dev-dependencies]
+stderrlog = "0.5.4"
