@@ -6,7 +6,6 @@ description = "A Rust port of the ProgressLogger class from the DSI Utilities"
 repository = "https://github.com/vigna/dsi-progress-logger-rs/"
 license = "Apache-2.0 OR LGPL-2.1-or-later"
 keywords = ["log", "progress"]
-categories = []
 
 [dependencies]
 log = "0.4.17"
