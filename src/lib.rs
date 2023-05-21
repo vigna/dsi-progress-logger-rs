@@ -248,12 +248,12 @@ impl ProgressLogger {
 
         f.write_fmt(format_args!(
             "{:.2} {}/{}, {:.2} {}/{}",
-            seconds_per_item / time_unit_timing.as_seconds(),
-            time_unit_timing.label(),
-            self.item_name,
             items_per_second * time_unit_speed.as_seconds(),
             pluralize(&self.item_name, 2, false),
-            time_unit_speed.label()
+            time_unit_speed.label(),
+            seconds_per_item / time_unit_timing.as_seconds(),
+            time_unit_timing.label(),
+            self.item_name
         ))?;
 
         Ok(())
