@@ -1,8 +1,8 @@
 /*
- * Copyright (C) 2023 INRIA
- * Copyright (C) 2023 Sebastiano Vigna
+ * SPDX-FileCopyrightText: 2023 Inria
+ * SPDX-FileCopyrightText: 2023 Sebastiano Vigna
  *
- * SPDX-License-Identifier: LGPL-2.1-or-later OR Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
  */
 
 #[derive(Debug, Copy, Clone)]

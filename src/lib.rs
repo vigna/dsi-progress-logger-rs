@@ -1,8 +1,8 @@
 /*
- * Copyright (C) 2023 INRIA
- * Copyright (C) 2023 Sebastiano Vigna
+ * SPDX-FileCopyrightText: 2023 Inria
+ * SPDX-FileCopyrightText: 2023 Sebastiano Vigna
  *
- * SPDX-License-Identifier: LGPL-2.1-or-later OR Apache-2.0
+ * SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
  */
 
 /*!
@@ -188,6 +188,7 @@ impl ProgressLogger {
     }
 
     /// Increase the count and, once every [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, check whether it is time to log.
+    #[inline(always)]
     pub fn light_update(&mut self) {
         self.count += 1;
         if (self.count & Self::LIGHT_UPDATE_MASK) == 0 {
