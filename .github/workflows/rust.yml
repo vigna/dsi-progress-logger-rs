@@ -21,4 +21,4 @@ jobs:
     - name: Run tests
       run: cargo test --verbose --target x86_64-unknown-linux-gnu
     - name: Run clippy
-      run: cargo clippy -- -Dclippy::all -Dclippy::cargo -A clippy::cargo-common-metadata
+      run: cargo clippy -- -Dclippy::all -Dclippy::cargo
