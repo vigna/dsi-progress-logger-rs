@@ -327,10 +327,10 @@ impl Display for ProgressLogger {
 
             if let Some(system) = &self.system {
                 f.write_fmt(format_args!(
-                    "; used/avail/free/total mem {}B/{}B/{}B/{}B",
+                    "; used/avail/free/total mem {}/{}B/{}B/{}B",
                     system
                         .process(self.pid)
-                        .map(|process| humanize(process.memory() as _))
+                        .map(|process| humanize(process.memory() as _) + "B")
                         .unwrap_or("N/A".to_string()),
                     humanize(system.available_memory() as _),
                     humanize(system.free_memory() as _),
