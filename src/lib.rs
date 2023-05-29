@@ -303,7 +303,7 @@ impl Display for ProgressLogger {
                 self.fmt_timing_speed(f, seconds_per_item)?;
 
                 if let Some(expected_updates) = self.expected_updates {
-                    let millis_to_end: u128 = ((expected_updates - self.count) as u128
+                    let millis_to_end: u128 = (expected_updates.saturating_sub(self.count) as u128
                         * elapsed.as_millis())
                         / (self.count as u128 + 1);
                     f.write_fmt(format_args!(
