@@ -41,7 +41,7 @@ use dsi_progress_logger::ProgressLogger;
 
 stderrlog::new().init().unwrap();
 let mut pl = ProgressLogger::default();
-pl.item_name = "pumpkin".to_string();
+pl.item_name = "pumpkin".into();
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
    // do something on each pumlkin
@@ -55,7 +55,7 @@ use dsi_progress_logger::ProgressLogger;
 
 stderrlog::new().init().unwrap();
 let mut pl = ProgressLogger::default();
-pl.item_name = "pumpkin".to_string();
+pl.item_name = "pumpkin".into();
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
    // do something on each pumlkin
@@ -73,6 +73,7 @@ let mut pl = ProgressLogger::default().display_memory();
 use log::info;
 use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
+use std::borrow::Cow;
 use std::fmt::{Display, Formatter, Result};
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessExt, RefreshKind, System, SystemExt};
@@ -82,7 +83,7 @@ use utils::*;
 
 pub struct ProgressLogger {
     /// The name of an item. Defaults to `item`.
-    pub item_name: String,
+    pub item_name: Cow<'static, str>,
     /// The log interval. Defaults to 10 seconds.
     pub log_interval: Duration,
     /// The expected number of updates. If set, the logger will display the percentage of completion and
@@ -109,7 +110,7 @@ pub struct ProgressLogger {
 impl Default for ProgressLogger {
     fn default() -> Self {
         Self {
-            item_name: "item".to_string(),
+            item_name: "item".into(),
             log_interval: Duration::from_secs(10),
             expected_updates: None,
             time_unit: None,
