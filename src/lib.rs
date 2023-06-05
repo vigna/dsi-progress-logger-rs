@@ -11,28 +11,28 @@ It is a port of the Java class [`it.unimi.dsi.util.ProgressLogger`](https://dsiu
 from the [DSI Utilities](https://dsiutils.di.unimi.it/).
 Logging is based on the standard [`log`](https://docs.rs/log) crate at the `info` level.
 
-To log the progress of an activity, you call [`start`](#methods.start). Then, each time you want to mark progress,
-you call [`update`](#methods.update), which increases the item counter, and will log progress information
+To log the progress of an activity, you call [`start`](ProgressLogger::start). Then, each time you want to mark progress,
+you call [`update`](ProgressLogger::update), which increases the item counter, and will log progress information
 if enough time has passed since the last log. The time check happens only on multiples of
-[`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 in the case of [`light_update`](#methods.light_update),
+[`LIGHT_UPDATE_MASK`](ProgressLogger::LIGHT_UPDATE_MASK) + 1 in the case of [`light_update`](ProgressLogger::light_update),
 which should be used when the activity has an extremely low cost that is comparable to that
 of the time check (a call to [`Instant::now()`]) itself.
 
-Some fields can be set at any time to customize the logger: please see the [documentation of the fields](#fields).
+Some fields can be set at any time to customize the logger: please see the [documentation of the fields](ProgressLogger).
 It is also possible to log used and free memory at each log interval by calling
-[`display_memory`](#methods.display_memory). Memory is read from system data by the [`sysinfo`] crate, and
+[`display_memory`](ProgressLogger::display_memory). Memory is read from system data by the [`sysinfo`] crate, and
 will be updated at each log interval (note that this will slightly slow down the logging process). Moreover,
 since it is impossible to update the memory information from the [`Display::fmt`] implementation,
-you should call [`refresh_memory`](#methods.refresh_memory) before displaying the logger
+you should call [`refresh`](ProgressLogger::refresh) before displaying the logger
 on your own.
 
 At any time, displaying the progress logger will give you time information up to the present.
-When the activity is over, you call [`stop`](#methods.stop), which fixes the final time, and
-possibly display again the logger. [`done`](#methods.done) will stop the logger, print `Completed.`,
+When the activity is over, you call [`stop`](ProgressLogger::stop), which fixes the final time, and
+possibly display again the logger. [`done`](ProgressLogger::done) will stop the logger, print `Completed.`,
 and display the final stats. There are also a few other utility methods that make it possible to
 customize the logging process.
 
-After you finished a run of the progress logger, can call [`start`](#fields.start)
+After you finished a run of the progress logger, can call [`start`](ProgressLogger::start)
 again to measure another activity.
 
 A typical call sequence to a progress logger is as follows:
