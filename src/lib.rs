@@ -41,7 +41,7 @@ use dsi_progress_logger::ProgressLogger;
 
 stderrlog::new().init().unwrap();
 let mut pl = ProgressLogger::default();
-pl.item_name = "pumpkin".into();
+pl.item_name = "pumpkin";
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
    // do something on each pumlkin
@@ -55,7 +55,7 @@ use dsi_progress_logger::ProgressLogger;
 
 stderrlog::new().init().unwrap();
 let mut pl = ProgressLogger::default();
-pl.item_name = "pumpkin".into();
+pl.item_name = "pumpkin";
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
    // do something on each pumlkin
@@ -73,7 +73,6 @@ let mut pl = ProgressLogger::default().display_memory();
 use log::info;
 use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
-use std::borrow::Cow;
 use std::fmt::{Display, Formatter, Result};
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessExt, RefreshKind, System, SystemExt};
@@ -81,9 +80,9 @@ use sysinfo::{Pid, ProcessExt, RefreshKind, System, SystemExt};
 mod utils;
 use utils::*;
 
-pub struct ProgressLogger {
+pub struct ProgressLogger<'a> {
     /// The name of an item. Defaults to `item`.
-    pub item_name: Cow<'static, str>,
+    pub item_name: &'a str,
     /// The log interval. Defaults to 10 seconds.
     pub log_interval: Duration,
     /// The expected number of updates. If set, the logger will display the percentage of completion and
@@ -107,7 +106,7 @@ pub struct ProgressLogger {
     pid: Pid,
 }
 
-impl Default for ProgressLogger {
+impl<'a> Default for ProgressLogger<'a> {
     fn default() -> Self {
         Self {
             item_name: "item".into(),
@@ -127,7 +126,7 @@ impl Default for ProgressLogger {
     }
 }
 
-impl ProgressLogger {
+impl<'a> ProgressLogger<'a> {
     /// Calls to [light_update](#method.light_update) will cause a call to
     /// [`Instant::now`] only if the current count
     /// is a multiple of this mask plus one.
@@ -261,7 +260,7 @@ impl ProgressLogger {
     }
 }
 
-impl Display for ProgressLogger {
+impl<'a> Display for ProgressLogger<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if let Some(start_time) = self.start_time {
             let count_fmtd = if self.time_unit.is_none() {
