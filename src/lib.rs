@@ -109,7 +109,7 @@ pub struct ProgressLogger<'a> {
 impl<'a> Default for ProgressLogger<'a> {
     fn default() -> Self {
         Self {
-            item_name: "item".into(),
+            item_name: "item",
             log_interval: Duration::from_secs(10),
             expected_updates: None,
             time_unit: None,
@@ -249,7 +249,7 @@ impl<'a> ProgressLogger<'a> {
         f.write_fmt(format_args!(
             "{:.2} {}/{}, {:.2} {}/{}",
             items_per_second * time_unit_speed.as_seconds(),
-            pluralize(&self.item_name, 2, false),
+            pluralize(self.item_name, 2, false),
             time_unit_speed.label(),
             seconds_per_item / time_unit_timing.as_seconds(),
             time_unit_timing.label(),
@@ -282,7 +282,7 @@ impl<'a> Display for ProgressLogger<'a> {
                     f.write_fmt(format_args!(
                         " [{} {}, ",
                         count_fmtd,
-                        pluralize(&self.item_name, self.count as isize, false)
+                        pluralize(self.item_name, self.count as isize, false)
                     ))?;
                     self.fmt_timing_speed(f, seconds_per_item)?;
                     f.write_fmt(format_args!("]"))?
@@ -295,7 +295,7 @@ impl<'a> Display for ProgressLogger<'a> {
                 f.write_fmt(format_args!(
                     "{} {}, {}, ",
                     count_fmtd,
-                    pluralize(&self.item_name, self.count as isize, false),
+                    pluralize(self.item_name, self.count as isize, false),
                     TimeUnit::pretty_print(elapsed.as_millis()),
                 ))?;
 
