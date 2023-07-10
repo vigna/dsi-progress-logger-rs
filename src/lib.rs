@@ -74,11 +74,25 @@ use log::info;
 use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
 use std::fmt::{Display, Formatter, Result};
+use std::sync::atomic::{compiler_fence, fence, AtomicUsize, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessExt, RefreshKind, System, SystemExt};
 
 mod utils;
 use utils::*;
+
+#[repr(align(64))]
+/// A counter that uses a whole cache line so that it can be updated
+/// without causing false sharing.
+struct ConcurrentCounter(AtomicUsize);
+
+/// A struct that holds both times because we alwasy need to update both
+/// at the same time and this way we can use just one Mutex.
+struct LogTime {
+    last_log_time: Instant,
+    next_log_time: Instant,
+}
 
 pub struct ProgressLogger<'a> {
     /// The name of an item. Defaults to `item`.
@@ -95,13 +109,14 @@ pub struct ProgressLogger<'a> {
     /// Display additionally the speed achieved during the last log interval.
     pub local_speed: bool,
     start_time: Option<Instant>,
-    last_log_time: Instant,
-    next_log_time: Instant,
+    log_time: Mutex<LogTime>,
     stop_time: Option<Instant>,
-    count: usize,
-    last_count: usize,
+    /// Thread specific counters
+    concurrent_counts: Vec<ConcurrentCounter>,
+    count: AtomicUsize,
+    last_count: AtomicUsize,
     /// Display additionally the amount of used and free memory using this [`sysinfo::System`]
-    system: Option<System>,
+    system: Option<Mutex<System>>,
     /// The pid of the current process
     pid: Pid,
 }
@@ -115,11 +130,16 @@ impl<'a> Default for ProgressLogger<'a> {
             time_unit: None,
             local_speed: false,
             start_time: None,
-            last_log_time: Instant::now(),
-            next_log_time: Instant::now(),
+            log_time: Mutex::new(LogTime {
+                last_log_time: Instant::now(),
+                next_log_time: Instant::now(),
+            }),
             stop_time: None,
-            count: 0,
-            last_count: 0,
+            concurrent_counts: (0..rayon::current_num_threads())
+                .map(|_| ConcurrentCounter(AtomicUsize::new(0)))
+                .collect(),
+            count: AtomicUsize::new(0),
+            last_count: AtomicUsize::new(0),
             system: None,
             pid: Pid::from(std::process::id() as usize),
         }
@@ -127,79 +147,143 @@ impl<'a> Default for ProgressLogger<'a> {
 }
 
 impl<'a> ProgressLogger<'a> {
+    /// The exponent of 2 used to compute [`LIGHT_UPDATE_MASK`]
+    pub const LIGHT_UPDATE_EXP: usize = 20;
     /// Calls to [light_update](#method.light_update) will cause a call to
     /// [`Instant::now`] only if the current count
     /// is a multiple of this mask plus one.
-    pub const LIGHT_UPDATE_MASK: usize = (1 << 20) - 1;
+    pub const LIGHT_UPDATE_MASK: usize = (1 << Self::LIGHT_UPDATE_EXP) - 1;
+
+    /// Calls to [light_update_par](#method.light_update) will read the other
+    /// threads counters and update the count, which might call [`Instant::now`]
+    /// if the current count is a multiple of this mask plus one.
+    pub const LIGHT_UPDATE_MASK_PAR: usize = (1 << 15) - 1;
+
+    /// The atomico ordering used by all atomic operations.
+    const ORDERING: Ordering = Ordering::Relaxed;
+
     /// Start the logger, displaying the given message.
     pub fn start<T: AsRef<str>>(&mut self, msg: T) {
         let now = Instant::now();
         self.start_time = Some(now);
         self.stop_time = None;
-        self.count = 0;
-        self.last_count = 0;
-        self.last_log_time = now;
-        self.next_log_time = now + self.log_interval;
+        self.count = AtomicUsize::new(0);
+        self.last_count = AtomicUsize::new(0);
+        {
+            let mut log_time = self.log_time.lock().unwrap();
+            log_time.last_log_time = now;
+            log_time.next_log_time = now + self.log_interval;
+        }
         info!("{}", msg.as_ref());
     }
 
     /// Chainable setter enabling memory display.
     pub fn display_memory(mut self) -> Self {
         if self.system.is_none() {
-            self.system = Some(System::new_with_specifics(RefreshKind::new().with_memory()));
+            self.system = Some(Mutex::new(System::new_with_specifics(
+                RefreshKind::new().with_memory(),
+            )));
         }
         self
     }
 
     /// Refresh memory information, if previously requested with [`display_memory`](#methods.display_memory).
     /// You do not need to call this method unless you display the logger manually.
-    pub fn refresh(&mut self) {
-        if let Some(system) = &mut self.system {
+    pub fn refresh(&self) {
+        if let Some(system) = &self.system {
+            let mut system = system.lock().unwrap();
             system.refresh_memory();
             system.refresh_process(self.pid);
         }
     }
 
-    fn log(&mut self, now: Instant) {
+    fn log(&self, count: usize, now: Instant) {
         self.refresh();
         info!("{}", self);
-        self.last_count = self.count;
-        self.last_log_time = now;
-        self.next_log_time = now + self.log_interval;
+        self.last_count.store(count, Self::ORDERING);
+        {
+            let mut log_time = self.log_time.lock().unwrap();
+            log_time.last_log_time = now;
+            log_time.next_log_time = now + self.log_interval;
+        }
     }
 
-    fn log_if(&mut self) {
+    fn log_if(&self, count: usize) {
         let now = Instant::now();
-        if self.next_log_time <= now {
-            self.log(now);
+        let next_log_time = { self.log_time.lock().unwrap().next_log_time };
+        if next_log_time <= now {
+            self.log(count, now);
         }
     }
 
     /// Increase the count and check whether it is time to log.
     pub fn update(&mut self) {
-        self.count += 1;
-        self.log_if();
+        let count = self.count.fetch_add(1, Self::ORDERING);
+        self.log_if(count);
+    }
+
+    /// Increase the count and check whether it is time to log.
+    pub fn update_par(&self) {
+        let count = self.count.fetch_add(1, Self::ORDERING);
+        self.log_if(count);
     }
 
     /// Set the count and check whether it is time to log.
     pub fn update_with_count(&mut self, count: usize) {
-        self.count += count;
-        self.log_if();
+        let count = self.count.fetch_add(count, Self::ORDERING);
+        self.log_if(count);
+    }
+
+    /// Set the count and check whether it is time to log.
+    pub fn update_with_count_par(&self, count: usize) {
+        let count = self.count.fetch_add(count, Self::ORDERING);
+        self.log_if(count);
     }
 
     /// Increase the count and, once every [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, check whether it is time to log.
     #[inline(always)]
     pub fn light_update(&mut self) {
-        self.count += 1;
-        if (self.count & Self::LIGHT_UPDATE_MASK) == 0 {
-            self.log_if();
+        let count = self.count.fetch_add(1, Self::ORDERING);
+        if (count & Self::LIGHT_UPDATE_MASK) == 0 {
+            self.log_if(count);
+        }
+    }
+
+    /// Increase the count and, once every [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, check whether it is time to log.
+    #[inline(always)]
+    pub fn light_update_par(&self) {
+        // Update the counter for this thread
+        let counter = self.concurrent_counts[rayon::current_thread_index().unwrap()]
+            .0
+            .fetch_add(1, Self::ORDERING);
+        // if this counter is big enough, update the global counter
+        // and check whether it is time to log
+        if (counter & Self::LIGHT_UPDATE_MASK_PAR) == 0 {
+            // since we are pushing multiple value, we can't just do & MASK == 0
+            // but we want to know if with this update, we passed a multiple
+            // of (mask + 1)
+            let (prev_count, new_count) = loop {
+                let prev_count = self.count.load(Self::ORDERING);
+                let new_count = prev_count + counter;
+                if self
+                    .count
+                    .compare_exchange_weak(prev_count, new_count, Self::ORDERING, Self::ORDERING)
+                    .is_ok()
+                {
+                    break (prev_count, new_count);
+                }
+            };
+            // if the higher bits changed, we passed a multiple of (mask + 1)
+            if (prev_count >> Self::LIGHT_UPDATE_EXP) != (new_count >> Self::LIGHT_UPDATE_EXP) {
+                self.log_if(new_count);
+            }
         }
     }
 
     /// Increase the count and force a log.
     pub fn update_and_display(&mut self) {
-        self.count += 1;
-        self.log(Instant::now());
+        let count = self.count.fetch_add(1, Self::ORDERING);
+        self.log(count, Instant::now());
     }
 
     /// Stop the logger, fixing the final time.
@@ -226,7 +310,8 @@ impl<'a> ProgressLogger<'a> {
     /// * you have used the logger as a handy timer, calling just [`start`](#fields.start) and this method.
 
     pub fn done_with_count(&mut self, count: usize) {
-        self.count = count;
+        self.count.store(count, Self::ORDERING);
+        fence(Ordering::SeqCst);
         self.done();
     }
 
@@ -263,26 +348,36 @@ impl<'a> ProgressLogger<'a> {
 impl<'a> Display for ProgressLogger<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if let Some(start_time) = self.start_time {
-            let count_fmtd = if self.time_unit.is_none() {
-                self.count.to_formatted_string(&Locale::en)
+            // retreive the data from the atomic variables trying to be as
+            // close as possible to the actual values
+            fence(Ordering::SeqCst);
+            compiler_fence(Ordering::SeqCst);
+            let last_log_time = { self.log_time.lock().unwrap().last_log_time };
+            let last_count = self.last_count.load(Self::ORDERING);
+            let (count, count_fmtd) = if self.time_unit.is_none() {
+                let count = self.count.load(Self::ORDERING);
+                (count, count.to_formatted_string(&Locale::en))
             } else {
-                self.count.to_string()
+                let count = self.count.load(Self::ORDERING);
+                (count, count.to_string())
             };
+            compiler_fence(Ordering::SeqCst);
+            fence(Ordering::SeqCst);
 
             if let Some(stop_time) = self.stop_time {
                 let elapsed = stop_time - start_time;
-                let seconds_per_item = elapsed.as_secs_f64() / self.count as f64;
+                let seconds_per_item = elapsed.as_secs_f64() / count as f64;
 
                 f.write_fmt(format_args!(
                     "Elapsed: {}",
                     TimeUnit::pretty_print(elapsed.as_millis())
                 ))?;
 
-                if self.count != 0 {
+                if count != 0 {
                     f.write_fmt(format_args!(
                         " [{} {}, ",
                         count_fmtd,
-                        pluralize(self.item_name, self.count as isize, false)
+                        pluralize(self.item_name, count as isize, false)
                     ))?;
                     self.fmt_timing_speed(f, seconds_per_item)?;
                     f.write_fmt(format_args!("]"))?
@@ -295,20 +390,20 @@ impl<'a> Display for ProgressLogger<'a> {
                 f.write_fmt(format_args!(
                     "{} {}, {}, ",
                     count_fmtd,
-                    pluralize(self.item_name, self.count as isize, false),
+                    pluralize(self.item_name, count as isize, false),
                     TimeUnit::pretty_print(elapsed.as_millis()),
                 ))?;
 
-                let seconds_per_item = elapsed.as_secs_f64() / self.count as f64;
+                let seconds_per_item = elapsed.as_secs_f64() / count as f64;
                 self.fmt_timing_speed(f, seconds_per_item)?;
 
                 if let Some(expected_updates) = self.expected_updates {
-                    let millis_to_end: u128 = (expected_updates.saturating_sub(self.count) as u128
+                    let millis_to_end: u128 = (expected_updates.saturating_sub(count) as u128
                         * elapsed.as_millis())
-                        / (self.count as u128 + 1);
+                        / (count as u128 + 1);
                     f.write_fmt(format_args!(
                         "; {:.2}% done, {} to end",
-                        100.0 * self.count as f64 / expected_updates as f64,
+                        100.0 * count as f64 / expected_updates as f64,
                         TimeUnit::pretty_print(millis_to_end)
                     ))?;
                 }
@@ -316,9 +411,8 @@ impl<'a> Display for ProgressLogger<'a> {
                 if self.local_speed && self.stop_time.is_none() {
                     f.write_fmt(format_args!(" ["))?;
 
-                    let elapsed = now - self.last_log_time;
-                    let seconds_per_item =
-                        elapsed.as_secs_f64() / (self.count - self.last_count) as f64;
+                    let elapsed = now - last_log_time;
+                    let seconds_per_item = elapsed.as_secs_f64() / (count - last_count) as f64;
                     self.fmt_timing_speed(f, seconds_per_item)?;
 
                     f.write_fmt(format_args!("]"))?;
@@ -326,6 +420,7 @@ impl<'a> Display for ProgressLogger<'a> {
             }
 
             if let Some(system) = &self.system {
+                let system = system.lock().unwrap();
                 f.write_fmt(format_args!(
                     "; used/avail/free/total mem {}/{}B/{}B/{}B",
                     system
