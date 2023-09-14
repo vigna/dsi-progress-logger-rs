@@ -132,7 +132,8 @@ impl<'a> ProgressLogger<'a> {
     /// is a multiple of this mask plus one.
     pub const LIGHT_UPDATE_MASK: usize = (1 << 20) - 1;
     /// Start the logger, displaying the given message.
-    pub fn start<T: AsRef<str>>(&mut self, msg: T) {
+    /// You can pass the empty string to display nothing.
+    pub fn start(&mut self, msg: impl AsRef<str>) {
         let now = Instant::now();
         self.start_time = Some(now);
         self.stop_time = None;
@@ -140,7 +141,9 @@ impl<'a> ProgressLogger<'a> {
         self.last_count = 0;
         self.last_log_time = now;
         self.next_log_time = now + self.log_interval;
-        info!("{}", msg.as_ref());
+        if !msg.as_ref().is_empty() {
+            info!("{}", msg.as_ref());
+        }
     }
 
     /// Chainable setter enabling memory display.
