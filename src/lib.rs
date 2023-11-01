@@ -187,13 +187,16 @@ impl<'a> Clone for ProgressLogger<'a> {
             expected_updates: self.expected_updates,
             time_unit: self.time_unit,
             local_speed: self.local_speed,
-            start_time: None,
+            start_time: self.start_time,
             last_log_time: self.last_log_time,
             next_log_time: self.next_log_time,
-            stop_time: None,
-            count: 0,
-            last_count: 0,
-            system: None,
+            stop_time: self.stop_time,
+            count: self.count,
+            last_count: self.last_count,
+            system: match self.system {
+                Some(_) => Some(System::new_with_specifics(RefreshKind::new().with_memory())),
+                None => None,
+            },
             pid: self.pid,
         }
     }
