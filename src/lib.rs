@@ -74,14 +74,14 @@ pl.display_memory(true);
 use log::info;
 use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Arguments, Display, Formatter, Result};
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessExt, RefreshKind, System, SystemExt};
 
 mod utils;
 use utils::*;
 
-/**!
+/**
 
 Logging trait.
 
@@ -161,7 +161,7 @@ pub trait ProgressLog {
     fn refresh(&mut self);
 
     /// Output the given message.
-    fn info(&self, msg: impl AsRef<str>);
+    fn info(&self, args: Arguments<'_>);
 
     /// Clone the logger, returning a logger with the same setup but with all the counters reset.
     fn clone(&self) -> Self;
@@ -269,9 +269,9 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         }
     }
 
-    fn info(&self, msg: impl AsRef<str>) {
+    fn info(&self, args: Arguments<'_>) {
         if let Some(pl) = self {
-            pl.info(msg);
+            pl.info(args);
         }
     }
 
@@ -493,10 +493,11 @@ impl ProgressLog for ProgressLogger {
         self.start_time?.elapsed().into()
     }
 
-    fn info(&self, msg: impl AsRef<str>) {
-        info!("{}", msg.as_ref());
+    fn info(&self, args: Arguments<'_>) {
+        info!("{}", std::fmt::format(args));
     }
 
+    #[allow(clippy::manual_map)]
     fn clone(&self) -> Self {
         Self {
             item_name: self.item_name.clone(),
