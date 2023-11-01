@@ -160,6 +160,9 @@ pub trait ProgressLog {
     /// You do not need to call this method unless you display the logger manually.
     fn refresh(&mut self);
 
+    /// Output the given message.
+    fn info(&self, msg: impl AsRef<str>);
+
     /// Clone the logger, returning a logger with the same setup but with all the counters reset.
     fn clone(&self) -> Self;
 }
@@ -263,6 +266,12 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
     fn refresh(&mut self) {
         if let Some(pl) = self {
             pl.refresh();
+        }
+    }
+
+    fn info(&self, msg: impl AsRef<str>) {
+        if let Some(pl) = self {
+            pl.info(msg);
         }
     }
 
@@ -482,6 +491,10 @@ impl ProgressLog for ProgressLogger {
 
     fn elapsed(&self) -> Option<Duration> {
         self.start_time?.elapsed().into()
+    }
+
+    fn info(&self, msg: impl AsRef<str>) {
+        info!("{}", msg.as_ref());
     }
 
     fn clone(&self) -> Self {
