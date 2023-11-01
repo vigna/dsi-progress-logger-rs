@@ -37,7 +37,7 @@ again to measure another activity.
 
 A typical call sequence to a progress logger is as follows:
 ```
-use dsi_progress_logger::ProgressLogger;
+use dsi_progress_logger::*;
 
 stderrlog::new().init().unwrap();
 let mut pl = ProgressLogger::default();
@@ -51,7 +51,7 @@ pl.done();
 ```
 A progress logger can also be used as a handy timer:
 ```
-use dsi_progress_logger::ProgressLogger;
+use dsi_progress_logger::*;
 
 stderrlog::new().init().unwrap();
 let mut pl = ProgressLogger::default();
@@ -64,7 +64,7 @@ pl.done_with_count(100);
 ```
 This progress logger will display information about  memory usage:
 ```
-use dsi_progress_logger::ProgressLogger;
+use dsi_progress_logger::*;
 
 stderrlog::new().init().unwrap();
 let mut pl = ProgressLogger::default().display_memory();
@@ -79,6 +79,79 @@ use sysinfo::{Pid, ProcessExt, RefreshKind, System, SystemExt};
 
 mod utils;
 use utils::*;
+
+pub trait ProgressLog {
+    fn start(&mut self, msg: impl AsRef<str>);
+    fn update(&mut self);
+    fn update_with_count(&mut self, count: usize);
+    fn light_update(&mut self);
+    fn update_and_display(&mut self);
+    fn stop(&mut self);
+    fn done(&mut self);
+    fn done_with_count(&mut self, count: usize);
+    fn elapsed(&self) -> Option<Duration>;
+    fn refresh(&mut self);
+}
+
+impl<P: ProgressLog> ProgressLog for Option<P> {
+    fn start(&mut self, msg: impl AsRef<str>) {
+        if let Some(pl) = self {
+            pl.start(msg);
+        }
+    }
+
+    fn update(&mut self) {
+        if let Some(pl) = self {
+            pl.update();
+        }
+    }
+
+    fn update_with_count(&mut self, count: usize) {
+        if let Some(pl) = self {
+            pl.update_with_count(count);
+        }
+    }
+
+    fn light_update(&mut self) {
+        if let Some(pl) = self {
+            pl.light_update();
+        }
+    }
+
+    fn update_and_display(&mut self) {
+        if let Some(pl) = self {
+            pl.update_and_display();
+        }
+    }
+
+    fn stop(&mut self) {
+        if let Some(pl) = self {
+            pl.stop();
+        }
+    }
+
+    fn done(&mut self) {
+        if let Some(pl) = self {
+            pl.done();
+        }
+    }
+
+    fn done_with_count(&mut self, count: usize) {
+        if let Some(pl) = self {
+            pl.done_with_count(count);
+        }
+    }
+
+    fn elapsed(&self) -> Option<Duration> {
+        self.as_ref().and_then(|pl| pl.elapsed())
+    }
+
+    fn refresh(&mut self) {
+        if let Some(pl) = self {
+            pl.refresh();
+        }
+    }
+}
 
 pub struct ProgressLogger<'a> {
     /// The name of an item. Defaults to `item`.
@@ -131,20 +204,6 @@ impl<'a> ProgressLogger<'a> {
     /// [`Instant::now`] only if the current count
     /// is a multiple of this mask plus one.
     pub const LIGHT_UPDATE_MASK: usize = (1 << 20) - 1;
-    /// Start the logger, displaying the given message.
-    /// You can pass the empty string to display nothing.
-    pub fn start(&mut self, msg: impl AsRef<str>) {
-        let now = Instant::now();
-        self.start_time = Some(now);
-        self.stop_time = None;
-        self.count = 0;
-        self.last_count = 0;
-        self.last_log_time = now;
-        self.next_log_time = now + self.log_interval;
-        if !msg.as_ref().is_empty() {
-            info!("{}", msg.as_ref());
-        }
-    }
 
     /// Chainable setter enabling memory display.
     pub fn display_memory(mut self) -> Self {
@@ -152,15 +211,6 @@ impl<'a> ProgressLogger<'a> {
             self.system = Some(System::new_with_specifics(RefreshKind::new().with_memory()));
         }
         self
-    }
-
-    /// Refresh memory information, if previously requested with [`display_memory`](#methods.display_memory).
-    /// You do not need to call this method unless you display the logger manually.
-    pub fn refresh(&mut self) {
-        if let Some(system) = &mut self.system {
-            system.refresh_memory();
-            system.refresh_process(self.pid);
-        }
     }
 
     fn log(&mut self, now: Instant) {
@@ -176,66 +226,6 @@ impl<'a> ProgressLogger<'a> {
         if self.next_log_time <= now {
             self.log(now);
         }
-    }
-
-    /// Increase the count and check whether it is time to log.
-    pub fn update(&mut self) {
-        self.count += 1;
-        self.log_if();
-    }
-
-    /// Set the count and check whether it is time to log.
-    pub fn update_with_count(&mut self, count: usize) {
-        self.count += count;
-        self.log_if();
-    }
-
-    /// Increase the count and, once every [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, check whether it is time to log.
-    #[inline(always)]
-    pub fn light_update(&mut self) {
-        self.count += 1;
-        if (self.count & Self::LIGHT_UPDATE_MASK) == 0 {
-            self.log_if();
-        }
-    }
-
-    /// Increase the count and force a log.
-    pub fn update_and_display(&mut self) {
-        self.count += 1;
-        self.log(Instant::now());
-    }
-
-    /// Stop the logger, fixing the final time.
-    pub fn stop(&mut self) {
-        self.stop_time = Some(Instant::now());
-        self.expected_updates = None;
-    }
-
-    /// Stop the logger, print `Completed.`, and display the final stats. The number of expected updates will be cleared.
-    pub fn done(&mut self) {
-        self.stop();
-        info!("Completed.");
-        // just to avoid wrong reuses
-        self.expected_updates = None;
-        info!("{}", self);
-    }
-
-    /// Stop the logger, set the count, print `Completed.`, and display the final stats.
-    /// The number of expected updates will be cleared.
-    ///
-    /// This method is particularly useful in two circumstances:
-    /// * you have updated the logger with some approximate values (e.g., in a multicore computation) but before
-    ///   printing the final stats you want the internal counter to contain an exact value;
-    /// * you have used the logger as a handy timer, calling just [`start`](#fields.start) and this method.
-
-    pub fn done_with_count(&mut self, count: usize) {
-        self.count = count;
-        self.done();
-    }
-
-    /// Return the elapsed time since the logger was started, or `None` if the logger has not been started.
-    pub fn elapsed(&self) -> Option<Duration> {
-        self.start_time?.elapsed().into()
     }
 
     fn fmt_timing_speed(&self, f: &mut Formatter<'_>, seconds_per_item: f64) -> Result {
@@ -260,6 +250,91 @@ impl<'a> ProgressLogger<'a> {
         ))?;
 
         Ok(())
+    }
+}
+
+impl<'a> ProgressLog for ProgressLogger<'a> {
+    /// Start the logger, displaying the given message.
+    /// You can pass the empty string to display nothing.
+    fn start(&mut self, msg: impl AsRef<str>) {
+        let now = Instant::now();
+        self.start_time = Some(now);
+        self.stop_time = None;
+        self.count = 0;
+        self.last_count = 0;
+        self.last_log_time = now;
+        self.next_log_time = now + self.log_interval;
+        if !msg.as_ref().is_empty() {
+            info!("{}", msg.as_ref());
+        }
+    }
+    /// Refresh memory information, if previously requested with [`display_memory`](#methods.display_memory).
+    /// You do not need to call this method unless you display the logger manually.
+    fn refresh(&mut self) {
+        if let Some(system) = &mut self.system {
+            system.refresh_memory();
+            system.refresh_process(self.pid);
+        }
+    }
+
+    /// Increase the count and check whether it is time to log.
+    fn update(&mut self) {
+        self.count += 1;
+        self.log_if();
+    }
+
+    /// Set the count and check whether it is time to log.
+    fn update_with_count(&mut self, count: usize) {
+        self.count += count;
+        self.log_if();
+    }
+
+    /// Increase the count and, once every [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, check whether it is time to log.
+    #[inline(always)]
+    fn light_update(&mut self) {
+        self.count += 1;
+        if (self.count & Self::LIGHT_UPDATE_MASK) == 0 {
+            self.log_if();
+        }
+    }
+
+    /// Increase the count and force a log.
+    fn update_and_display(&mut self) {
+        self.count += 1;
+        self.log(Instant::now());
+    }
+
+    /// Stop the logger, fixing the final time.
+    fn stop(&mut self) {
+        self.stop_time = Some(Instant::now());
+        self.expected_updates = None;
+    }
+
+    /// Stop the logger, print `Completed.`, and display the final stats. The number of expected updates will be cleared.
+    fn done(&mut self) {
+        self.stop();
+        info!("Completed.");
+        // just to avoid wrong reuses
+        self.expected_updates = None;
+        info!("{}", self);
+    }
+
+    /// Stop the logger, set the count, print `Completed.`, and display the final stats.
+    /// The number of expected updates will be cleared.
+    ///
+    /// This method is particularly useful in two circumstances:
+    /// * you have updated the logger with some approximate values (e.g., in a multicore computation) but before
+    ///   printing the final stats you want the internal counter to contain an exact value;
+    /// * you have used the logger as a handy timer, calling just [`start`](#fields.start) and this method.
+
+    fn done_with_count(&mut self, count: usize) {
+        self.count = count;
+        self.done();
+    }
+
+    /// Return the elapsed time since the logger was started, or `None` if the logger has not been started.
+    fn elapsed(&self) -> Option<Duration> {
+        self.start_time?.elapsed().into()
     }
 }
 

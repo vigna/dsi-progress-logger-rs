@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
  */
 
-use dsi_progress_logger::ProgressLogger;
+use dsi_progress_logger::*;
 use log::info;
 use std::thread;
 use stderrlog;
