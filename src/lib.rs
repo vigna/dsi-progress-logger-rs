@@ -179,6 +179,26 @@ pub struct ProgressLogger<'a> {
     pid: Pid,
 }
 
+impl<'a> Clone for ProgressLogger<'a> {
+    fn clone(&self) -> Self {
+        Self {
+            item_name: self.item_name,
+            log_interval: self.log_interval,
+            expected_updates: self.expected_updates,
+            time_unit: self.time_unit,
+            local_speed: self.local_speed,
+            start_time: None,
+            last_log_time: self.last_log_time,
+            next_log_time: self.next_log_time,
+            stop_time: None,
+            count: 0,
+            last_count: 0,
+            system: None,
+            pid: self.pid,
+        }
+    }
+}
+
 impl<'a> Default for ProgressLogger<'a> {
     fn default() -> Self {
         Self {
