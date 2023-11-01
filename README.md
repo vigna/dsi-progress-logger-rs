@@ -9,4 +9,5 @@ activity.
 
 # Acknowledgments
 
-This software has been partially supported by project SERICS (PE00000014) under the NRRP MUR program funded by the EU - NGEU.
+This software has been partially supported by project SERICS (PE00000014) under 
+the NRRP MUR program funded by the EU - NGEU.

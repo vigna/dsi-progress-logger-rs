@@ -6,33 +6,44 @@
  */
 
 /*!
+
 A tunable progress logger to log progress information about long-running activities.
+
 It is a port of the Java class [`it.unimi.dsi.util.ProgressLogger`](https://dsiutils.di.unimi.it/docs/it/unimi/dsi/logging/ProgressLogger.html)
 from the [DSI Utilities](https://dsiutils.di.unimi.it/).
 Logging is based on the standard [`log`](https://docs.rs/log) crate at the `info` level.
 
-To log the progress of an activity, you call [`start`](ProgressLogger::start). Then, each time you want to mark progress,
-you call [`update`](ProgressLogger::update), which increases the item counter, and will log progress information
-if enough time has passed since the last log. The time check happens only on multiples of
-[`LIGHT_UPDATE_MASK`](ProgressLogger::LIGHT_UPDATE_MASK) + 1 in the case of [`light_update`](ProgressLogger::light_update),
+There is a [`ProgressLog`] trait and a default implementation [`ProgressLogger`].
+
+To log the progress of an activity, you call [`start`](ProgressLog::start). Then, each time you want to mark progress,
+you call [`update`](ProgressLog::update), which increases the item counter, and will log progress information
+if enough time has passed since the last log. The time check happens (in the case of [`ProgressLogger`])only on multiples of
+[`LIGHT_UPDATE_MASK`](ProgressLogger::LIGHT_UPDATE_MASK) + 1 in the case of
+[`light_update`](ProgressLog::light_update),
 which should be used when the activity has an extremely low cost that is comparable to that
 of the time check (a call to [`Instant::now()`]) itself.
 
-Some fields can be set at any time to customize the logger: please see the [documentation of the fields](ProgressLogger).
+A few setters can be called at any time to customize the logger (e.g., [`item_name`](ProgressLog::item_name),
+[`log_interval`](ProgressLog::log_interval), [`expected_updates`](ProgressLog::expected_updates), etc.).
+The setters take and return  a mutable reference to the logger, so you must first assign
+the logger to a variable, and then you can chain-call the setters on the variable in fluent style.
+The disadvantage of this approach is that you must assign the logger to a variable, but the advantage
+is that you can call any setter without having to reassign the variable holding the logger.
+
 It is also possible to log used and free memory at each log interval by calling
-[`display_memory`](ProgressLogger::display_memory). Memory is read from system data by the [`sysinfo`] crate, and
-will be updated at each log interval (note that this will slightly slow down the logging process). Moreover,
-since it is impossible to update the memory information from the [`Display::fmt`] implementation,
-you should call [`refresh`](ProgressLogger::refresh) before displaying the logger
-on your own.
+[`display_memory`](ProgressLog::display_memory). Memory is read from system data by the [`sysinfo`] crate, and
+will be updated at each log interval (note that this will slightly slow down the logging process).
 
 At any time, displaying the progress logger will give you time information up to the present.
-When the activity is over, you call [`stop`](ProgressLogger::stop), which fixes the final time, and
-possibly display again the logger. [`done`](ProgressLogger::done) will stop the logger, print `Completed.`,
-and display the final stats. There are also a few other utility methods that make it possible to
-customize the logging process.
+However,  since it is impossible to update the memory information from the [`Display::fmt`] implementation,
+you should call [`refresh`](ProgressLog::refresh) before displaying the logger
+on your own.
 
-After you finished a run of the progress logger, can call [`start`](ProgressLogger::start)
+When the activity is over, you call [`stop`](ProgressLog::stop), which fixes the final time, and
+possibly display again the logger. [`done`](ProgressLog::done) will stop the logger, print `Completed.`,
+and display the final stats.
+
+After you finished a run of the progress logger, can call [`start`](ProgressLog::start)
 again to measure another activity.
 
 A typical call sequence to a progress logger is as follows:
@@ -40,11 +51,11 @@ A typical call sequence to a progress logger is as follows:
 use dsi_progress_logger::*;
 
 stderrlog::new().init().unwrap();
-let mut pl = ProgressLogger::default();
+let mut pl = ProgressLog::default();
 pl.item_name("pumpkin");
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
-   // do something on each pumlkin
+   // do something on each pumpkin
    pl.update();
 }
 pl.done();
@@ -58,7 +69,7 @@ let mut pl = ProgressLogger::default();
 pl.item_name("pumpkin");
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
-   // do something on each pumlkin
+   // do something on each pumpkin
 }
 pl.done_with_count(100);
 ```
@@ -70,7 +81,24 @@ stderrlog::new().init().unwrap();
 let mut pl = ProgressLogger::default();
 pl.display_memory(true);
 ```
+
+## Optional logging
+
+This crate supports optional logging by implementing [`ProgressLog`] for `Option<ProgressLog>` as a no-op.
+As a result, you can pass to functions an argument `pl` that is an `impl ProgressLog`, with the following behavior:
+
+- if you pass a [`ProgressLogger`], the progress logger will be used, without any check;
+- if you pass `Option<ProgressLogger>::None`, no logging will be performed, and in fact the logging
+  code should be entirely optimized away by the compiler;
+- if you pass an `Option::<ProgressLogger>`, logging will happen depending on the variant, and there
+  will be a runtime check for each call to `pl`.
+
+There is an [`info`](ProgressLog::info) method that can be used to log information to the logger
+at the `info` level.
+The advantage of using [`info`](ProgressLog::info) is that the
+logging will be optional depending on the type of the logger.
 */
+
 use log::info;
 use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
@@ -109,9 +137,9 @@ pub trait ProgressLog {
 
     /// Set the time unit to use for speed.
     ///
-    /// If not [`None], the logger will always display the speed in this unit
+    /// If not [`None`], the logger will always display the speed in this unit
     /// instead of making a choice of readable unit based on the elapsed time. Moreover, large numbers
-    /// will not be thousands separated. This is useful when the output of the logger must be parsed.
+    /// will not be thousands separated. This behavior is useful when the output of the logger must be parsed.
     fn time_unit(&mut self, time_unit: Option<TimeUnit>) -> &mut Self;
 
     /// Set whether to display additionally the speed achieved during the last log interval.
@@ -161,6 +189,9 @@ pub trait ProgressLog {
     fn refresh(&mut self);
 
     /// Output the given message.
+    ///
+    /// For maximum flexibility, this method takes as argument the result of a [`std::format_args!`] macro.
+    /// Note that there will be no output if the logger is the `None` variant.
     fn info(&self, args: Arguments<'_>);
 
     /// Clone the logger, returning a logger with the same setup but with all the counters reset.
