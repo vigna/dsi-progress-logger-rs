@@ -159,6 +159,9 @@ pub trait ProgressLog {
     /// Refresh memory information, if previously requested with [`display_memory`](#method.display_memory).
     /// You do not need to call this method unless you display the logger manually.
     fn refresh(&mut self);
+
+    /// Clone the logger, returning a logger with the same setup but with all the counters reset.
+    fn clone(&self) -> Self;
 }
 
 impl<P: ProgressLog> ProgressLog for Option<P> {
@@ -262,6 +265,10 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
             pl.refresh();
         }
     }
+
+    fn clone(&self) -> Self {
+        self.as_ref().map(|pl| pl.clone())
+    }
 }
 
 /**
@@ -284,39 +291,22 @@ pub struct ProgressLogger {
     time_unit: Option<TimeUnit>,
     /// Display additionally the speed achieved during the last log interval.
     local_speed: bool,
+    /// When the logger was started.
     start_time: Option<Instant>,
+    /// The last time we logged the activity (to compute speed).
     last_log_time: Instant,
+    /// The next time we will log the activity.
     next_log_time: Instant,
+    /// When the logger was stopped.
     stop_time: Option<Instant>,
+    /// The number of items.
     count: usize,
+    /// The number of items at the last log (to compute speed).
     last_count: usize,
     /// Display additionally the amount of used and free memory using this [`sysinfo::System`]
     system: Option<System>,
     /// The pid of the current process
     pid: Pid,
-}
-
-impl Clone for ProgressLogger {
-    fn clone(&self) -> Self {
-        Self {
-            item_name: self.item_name.clone(),
-            log_interval: self.log_interval,
-            expected_updates: self.expected_updates,
-            time_unit: self.time_unit,
-            local_speed: self.local_speed,
-            start_time: self.start_time,
-            last_log_time: self.last_log_time,
-            next_log_time: self.next_log_time,
-            stop_time: self.stop_time,
-            count: self.count,
-            last_count: self.last_count,
-            system: match self.system {
-                Some(_) => Some(System::new_with_specifics(RefreshKind::new().with_memory())),
-                None => None,
-            },
-            pid: self.pid,
-        }
-    }
 }
 
 impl Default for ProgressLogger {
@@ -492,6 +482,20 @@ impl ProgressLog for ProgressLogger {
 
     fn elapsed(&self) -> Option<Duration> {
         self.start_time?.elapsed().into()
+    }
+
+    fn clone(&self) -> Self {
+        Self {
+            item_name: self.item_name.clone(),
+            log_interval: self.log_interval,
+            time_unit: self.time_unit,
+            local_speed: self.local_speed,
+            system: match self.system {
+                Some(_) => Some(System::new_with_specifics(RefreshKind::new().with_memory())),
+                None => None,
+            },
+            ..ProgressLogger::default()
+        }
     }
 }
 
