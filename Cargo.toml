@@ -1,6 +1,6 @@
 [package]
 name = "dsi-progress-logger"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "A Rust port of the ProgressLogger class from the DSI Utilities"
 repository = "https://github.com/vigna/dsi-progress-logger-rs/"
@@ -13,7 +13,7 @@ authors = ["Tommaso Fontana", "Sebastiano Vigna <sebastiano.vigna@unimi.it>"]
 log = "0.4.17"
 num-format = "0.4.4"
 pluralizer = "0.4.0"
-sysinfo = "0.29.0"
+sysinfo = "0.29.10"
 
 [dev-dependencies]
 stderrlog = "0.5.4"

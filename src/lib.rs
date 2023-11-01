@@ -51,7 +51,7 @@ A typical call sequence to a progress logger is as follows:
 use dsi_progress_logger::*;
 
 stderrlog::new().init().unwrap();
-let mut pl = ProgressLog::default();
+let mut pl = ProgressLogger::default();
 pl.item_name("pumpkin");
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
@@ -88,15 +88,24 @@ This crate supports optional logging by implementing [`ProgressLog`] for `Option
 As a result, you can pass to functions an argument `pl` that is an `impl ProgressLog`, with the following behavior:
 
 - if you pass a [`ProgressLogger`], the progress logger will be used, without any check;
-- if you pass `Option<ProgressLogger>::None`, no logging will be performed, and in fact the logging
+- if you pass `Option::<ProgressLogger>::None`, no logging will be performed, and in fact the logging
   code should be entirely optimized away by the compiler;
-- if you pass an `Option::<ProgressLogger>`, logging will happen depending on the variant, and there
+- if you pass an `Option<ProgressLogger>`, logging will happen depending on the variant, and there
   will be a runtime check for each call to `pl`.
 
 There is an [`info`](ProgressLog::info) method that can be used to log information to the logger
 at the `info` level.
 The advantage of using [`info`](ProgressLog::info) is that the
 logging will be optional depending on the type of the logger.
+
+## Cloning
+
+The [`clone`](ProgressLog::clone) method will return a logger with the same setup but with all the counters reset.
+This is useful when you want to configura a logger and then use its configuration for other loggers.
+
+Note that this method is part of [`ProgressLog`]: otherwise, because of the orphan rule
+we would not be able to implement it for `Option<ProgressLog>`.
+
 */
 
 use log::info;
@@ -104,7 +113,7 @@ use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
 use std::fmt::{Arguments, Display, Formatter, Result};
 use std::time::{Duration, Instant};
-use sysinfo::{Pid, ProcessExt, RefreshKind, System, SystemExt};
+use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 
 mod utils;
 use utils::*;
@@ -192,6 +201,16 @@ pub trait ProgressLog {
     ///
     /// For maximum flexibility, this method takes as argument the result of a [`std::format_args!`] macro.
     /// Note that there will be no output if the logger is the `None` variant.
+    ///
+    /// # Example
+    /// ```rust
+    /// use dsi_progress_logger::*;
+    ///
+    /// stderrlog::new().init().unwrap();
+    /// let logger_name = "my_logger";
+    /// let mut pl = ProgressLogger::default();
+    /// pl.info(format_args!("My logger named {}", logger_name));
+    /// ```
     fn info(&self, args: Arguments<'_>);
 
     /// Clone the logger, returning a logger with the same setup but with all the counters reset.
@@ -427,9 +446,6 @@ impl ProgressLog for ProgressLogger {
             }
             _ => (),
         }
-        if self.system.is_none() {
-            self.system = Some(System::new_with_specifics(RefreshKind::new().with_memory()));
-        }
         self
     }
 
@@ -473,8 +489,7 @@ impl ProgressLog for ProgressLogger {
 
     fn refresh(&mut self) {
         if let Some(system) = &mut self.system {
-            system.refresh_memory();
-            system.refresh_process(self.pid);
+            system.refresh_process_specifics(self.pid, ProcessRefreshKind::new());
         }
     }
 
@@ -512,6 +527,7 @@ impl ProgressLog for ProgressLogger {
         info!("Completed.");
         // just to avoid wrong reuses
         self.expected_updates = None;
+        self.refresh();
         info!("{}", self);
     }
 
@@ -609,6 +625,8 @@ impl Display for ProgressLogger {
                 }
             }
 
+            // It would be ideal to refresh self.system here, but this operation
+            // would require an &mut self reference.
             if let Some(system) = &self.system {
                 f.write_fmt(format_args!(
                     "; used/avail/free/total mem {}/{}B/{}B/{}B",
