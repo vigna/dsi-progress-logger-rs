@@ -129,6 +129,13 @@ pass as a [`ProgressLog`] either a [`ProgressLogger`], an `Option<ProgressLogger
 */
 pub trait ProgressLog {
     /// Display memory information.
+    ///
+    /// Memory information include:
+    /// - the [resident-set size](sysinfo::Process::memory) of the process that created the logger;
+    /// - the [virtual-memory size](sysinfo::Process::virtual_memory) of the process that created the logger;
+    /// - the [available memory](`sysinfo::System::available_memory);
+    /// - the [free memory](`sysinfo::System::free_memory);
+    /// - the [total amount](sysinfo::System::total_memory) of memory.
     fn display_memory(&mut self, display_memory: bool) -> &mut Self;
 
     /// Set the name of an item.
@@ -629,10 +636,14 @@ impl Display for ProgressLogger {
             // would require an &mut self reference.
             if let Some(system) = &self.system {
                 f.write_fmt(format_args!(
-                    "; used/avail/free/total mem {}/{}B/{}B/{}B",
+                    "; res/vir/avail/free/total mem {}/{}/{}B/{}B/{}B",
                     system
                         .process(self.pid)
                         .map(|process| humanize(process.memory() as _) + "B")
+                        .unwrap_or("N/A".to_string()),
+                    system
+                        .process(self.pid)
+                        .map(|process| humanize(process.virtual_memory() as _) + "B")
                         .unwrap_or("N/A".to_string()),
                     humanize(system.available_memory() as _),
                     humanize(system.free_memory() as _),
