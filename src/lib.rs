@@ -7,6 +7,13 @@
 
 /*!
 
+# DSI Progress Logger
+
+[![downloads](https://img.shields.io/crates/d/dsi-progress-logger)](https://crates.io/crates/dsi-progress-logger)
+[![dependents](https://img.shields.io/librariesio/dependents/cargo/dsi-progress-logger)](https://crates.io/crates/dsi-progress-logger/reverse_dependencies)
+![GitHub CI](https://github.com/vigna/dsi-progress-logger-rs/actions/workflows/rust.yml/badge.svg)
+![license](https://img.shields.io/crates/l/dsi-progress-logger)
+
 A tunable progress logger to log progress information about long-running activities.
 
 It is a port of the Java class [`it.unimi.dsi.util.ProgressLogger`](https://dsiutils.di.unimi.it/docs/it/unimi/dsi/logging/ProgressLogger.html)
@@ -101,7 +108,7 @@ logging will be optional depending on the type of the logger.
 ## Cloning
 
 The [`clone`](ProgressLog::clone) method will return a logger with the same setup but with all the counters reset.
-This is useful when you want to configura a logger and then use its configuration for other loggers.
+This is useful when you want to configure a logger and then use its configuration for other loggers.
 
 Note that this method is part of [`ProgressLog`]: otherwise, because of the orphan rule
 we would not be able to implement it for `Option<ProgressLog>`.
