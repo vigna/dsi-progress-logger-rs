@@ -13,38 +13,43 @@ Logging is based on the standard [`log`](https://docs.rs/log) crate at the `info
 
 There is a [`ProgressLog`] trait and a default implementation [`ProgressLogger`].
 
-To log the progress of an activity, you call [`start`](ProgressLog::start). Then, each time you want to mark progress,
-you call [`update`](ProgressLog::update), which increases the item counter, and will log progress information
-if enough time has passed since the last log. The time check happens (in the case of [`ProgressLogger`])only on multiples of
-[`LIGHT_UPDATE_MASK`](ProgressLogger::LIGHT_UPDATE_MASK) + 1 in the case of
-[`light_update`](ProgressLog::light_update),
-which should be used when the activity has an extremely low cost that is comparable to that
-of the time check (a call to [`Instant::now()`]) itself.
+To log the progress of an activity, you call [`start`]. Then, each time you want
+to mark progress, you call [`update`], which increases the item counter, and
+will log progress information if enough time has passed since the last log. The
+time check happens (in the case of [`ProgressLogger`]) only on multiples of
+[`LIGHT_UPDATE_MASK`] + 1 in the case of [`light_update`], which should be used
+when the activity has an extremely low cost that is comparable to that of the
+time check (a call to
+[`Instant::now()`](https://doc.rust-lang.org/std/time/struct.Instant.html#method.now))
+itself.
 
-A few setters can be called at any time to customize the logger (e.g., [`item_name`](ProgressLog::item_name),
-[`log_interval`](ProgressLog::log_interval), [`expected_updates`](ProgressLog::expected_updates), etc.).
-The setters take and return  a mutable reference to the logger, so you must first assign
-the logger to a variable, and then you can chain-call the setters on the variable in fluent style.
-The disadvantage of this approach is that you must assign the logger to a variable, but the advantage
-is that you can call any setter without having to reassign the variable holding the logger.
+A few setters can be called at any time to customize the logger (e.g.,
+[`item_name`], [`log_interval`], [`expected_updates`], etc.). The setters take
+and return a mutable reference to the logger, so you must first assign the
+logger to a variable, and then you can chain-call the setters on the variable in
+fluent style. The disadvantage of this approach is that you must assign the
+logger to a variable, but the advantage is that you can call any setter without
+having to reassign the variable holding the logger.
 
 It is also possible to log used and free memory at each log interval by calling
-[`display_memory`](ProgressLog::display_memory). Memory is read from system data by the [`sysinfo`] crate, and
-will be updated at each log interval (note that this will slightly slow down the logging process).
+[`display_memory`]. Memory is read from system data by the [`sysinfo`] crate,
+and will be updated at each log interval (note that this will slightly slow down
+the logging process).
 
-At any time, displaying the progress logger will give you time information up to the present.
-However,  since it is impossible to update the memory information from the [`Display::fmt`] implementation,
-you should call [`refresh`](ProgressLog::refresh) before displaying the logger
-on your own.
+At any time, displaying the progress logger will give you time information up to
+the present. However,  since it is impossible to update the memory information
+from the [`Display::fmt`] implementation, you should call [`refresh`] before
+displaying the logger on your own.
 
-When the activity is over, you call [`stop`](ProgressLog::stop), which fixes the final time, and
-possibly display again the logger. [`done`](ProgressLog::done) will stop the logger, print `Completed.`,
-and display the final stats.
+When the activity is over, you call [`stop`], which fixes the final time, and
+possibly display again the logger. [`done`] will stop the logger, print
+`Completed.`, and display the final stats.
 
-After you finished a run of the progress logger, can call [`start`](ProgressLog::start)
-again to measure another activity.
+After you finish a run of the progress logger, can call [`start`] again to
+measure another activity.
 
 A typical call sequence to a progress logger is as follows:
+
 ```rust
 use dsi_progress_logger::*;
 
@@ -58,7 +63,9 @@ for _ in 0..100 {
 }
 pl.done();
 ```
+
 A progress logger can also be used as a handy timer:
+
 ```rust
 use dsi_progress_logger::*;
 
@@ -71,7 +78,9 @@ for _ in 0..100 {
 }
 pl.done_with_count(100);
 ```
+
 This progress logger will display information about  memory usage:
+
 ```rust
 use dsi_progress_logger::*;
 
@@ -91,21 +100,36 @@ As a result, you can pass to functions an argument `pl` that is an `impl Progres
 - if you pass an `Option<ProgressLogger>`, logging will happen depending on the variant, and there
   will be a runtime check for each call to `pl`.
 
-There is an [`info`](ProgressLog::info) method that can be used to log information to the logger
+There is an [`info`] method that can be used to log information to the logger
 at the `info` level.
-The advantage of using [`info`](ProgressLog::info) is that the
+The advantage of using [`info`] is that the
 logging will be optional depending on the type of the logger.
 
 ## Cloning
 
-The [`clone`](ProgressLog::clone) method will return a logger with the same setup but with all the counters reset.
+The [`clone`] method will return a logger with the same setup but with all the counters reset.
 This is useful when you want to configure a logger and then use its configuration for other loggers.
 
 Note that this method is part of [`ProgressLog`]: otherwise, because of the orphan rule
 we would not be able to implement it for `Option<ProgressLog>`.
 
+## Acknowledgments
 
-# Acknowledgments
-
-This software has been partially supported by project SERICS (PE00000014) under 
+This software has been partially supported by project SERICS (PE00000014) under
 the NRRP MUR program funded by the EU - NGEU.
+
+[`ProgressLog`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html
+[`ProgressLogger`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.ProgressLogger.html
+[`start`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.start
+[`item_name`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.item_name
+[`log_interval`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.log_interval
+[`expected_updates`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.expected_updates
+[`refresh`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.refresh
+[`stop`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.stop
+[`done`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.done
+[`info`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.info
+[`clone`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.clone
+[`display_memory`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.display_memory
+[`update`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.light_update
+[`light_update`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.light_update
+[`LIGHT_UPDATE_MASK`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.ProgressLogger.html#associatedconstant.LIGHT_UPDATE_MASK
