@@ -32,7 +32,7 @@ pub trait ProgressLog {
     /// Memory information include:
     /// - the [resident-set size](sysinfo::Process::memory) of the process that created the logger;
     /// - the [virtual-memory size](sysinfo::Process::virtual_memory) of the process that created the logger;
-    /// - the [available memory](`sysinfo::System::available_memory);
+    /// - the [available memory](sysinfo::System::available_memory);
     /// - the [free memory](`sysinfo::System::free_memory);
     /// - the [total amount](sysinfo::System::total_memory) of memory.
     fn display_memory(&mut self, display_memory: bool) -> &mut Self;
