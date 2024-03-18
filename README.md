@@ -7,11 +7,12 @@
 
 A tunable progress logger to log progress information about long-running activities.
 
-It is a port of the Java class [`it.unimi.dsi.util.ProgressLogger`](https://dsiutils.di.unimi.it/docs/it/unimi/dsi/logging/ProgressLogger.html)
-from the [DSI Utilities](https://dsiutils.di.unimi.it/).
-Logging is based on the standard [`log`](https://docs.rs/log) crate at the `info` level.
+It is a port of the Java class [`it.unimi.dsi.util.ProgressLogger`] from the
+[DSI Utilities]. Logging is based on the standard [`log`] crate at the `info`
+level.
 
-There is a [`ProgressLog`] trait and a default implementation [`ProgressLogger`].
+There is a [`ProgressLog`] trait and a default implementation
+[`ProgressLogger`].
 
 To log the progress of an activity, you call [`start`]. Then, each time you want
 to mark progress, you call [`update`], which increases the item counter, and
@@ -19,9 +20,7 @@ will log progress information if enough time has passed since the last log. The
 time check happens (in the case of [`ProgressLogger`]) only on multiples of
 [`LIGHT_UPDATE_MASK`] + 1 in the case of [`light_update`], which should be used
 when the activity has an extremely low cost that is comparable to that of the
-time check (a call to
-[`Instant::now()`](https://doc.rust-lang.org/std/time/struct.Instant.html#method.now))
-itself.
+time check (a call to [`Instant::now()`] itself.
 
 A few setters can be called at any time to customize the logger (e.g.,
 [`item_name`], [`log_interval`], [`expected_updates`], etc.). The setters take
@@ -51,9 +50,10 @@ measure another activity.
 A typical call sequence to a progress logger is as follows:
 
 ```rust
-use dsi_progress_logger::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use dsi_progress_logger::prelude::*;
 
-stderrlog::new().init().unwrap();
+stderrlog::new().verbosity(2).init()?;
 let mut pl = ProgressLogger::default();
 pl.item_name("pumpkin");
 pl.start("Smashing pumpkins...");
@@ -62,14 +62,17 @@ for _ in 0..100 {
    pl.update();
 }
 pl.done();
+#     Ok(())
+# }
 ```
 
 A progress logger can also be used as a handy timer:
 
 ```rust
-use dsi_progress_logger::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use dsi_progress_logger::prelude::*;
 
-stderrlog::new().init().unwrap();
+stderrlog::new().verbosity(2).init()?;
 let mut pl = ProgressLogger::default();
 pl.item_name("pumpkin");
 pl.start("Smashing pumpkins...");
@@ -77,16 +80,21 @@ for _ in 0..100 {
    // do something on each pumpkin
 }
 pl.done_with_count(100);
+#     Ok(())
+# }
 ```
 
 This progress logger will display information about  memory usage:
 
 ```rust
-use dsi_progress_logger::*;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use dsi_progress_logger::prelude::*;
 
-stderrlog::new().init().unwrap();
+stderrlog::new().verbosity(2).init()?;
 let mut pl = ProgressLogger::default();
 pl.display_memory(true);
+#     Ok(())
+# }
 ```
 
 ## Optional logging
@@ -133,3 +141,7 @@ the NRRP MUR program funded by the EU - NGEU.
 [`update`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.light_update
 [`light_update`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.light_update
 [`LIGHT_UPDATE_MASK`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.ProgressLogger.html#associatedconstant.LIGHT_UPDATE_MASK
+[`it.unimi.dsi.util.ProgressLogger`]: https://dsiutils.di.unimi.it/docs/it/unimi/dsi/logging/ProgressLogger.html
+[DSI Utilities]: https://dsiutils.di.unimi.it/
+[`log`]: https://docs.rs/log
+[`Instant::now()`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now

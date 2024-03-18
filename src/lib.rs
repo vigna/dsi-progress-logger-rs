@@ -110,12 +110,15 @@ pub trait ProgressLog {
     ///
     /// # Example
     /// ```rust
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// use dsi_progress_logger::*;
     ///
-    /// stderrlog::new().init().unwrap();
+    /// stderrlog::new().verbosity(2).init()?;
     /// let logger_name = "my_logger";
     /// let mut pl = ProgressLogger::default();
     /// pl.info(format_args!("My logger named {}", logger_name));
+    /// #     Ok(())
+    /// # }
     /// ```
     fn info(&self, args: Arguments<'_>);
 
@@ -555,4 +558,8 @@ impl Display for ProgressLogger {
             write!(f, "ProgressLogger not started")
         }
     }
+}
+
+pub mod prelude {
+    pub use super::{ProgressLog, ProgressLogger};
 }
