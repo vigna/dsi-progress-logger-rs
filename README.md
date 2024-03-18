@@ -4,6 +4,10 @@
 [![dependents](https://img.shields.io/librariesio/dependents/cargo/dsi-progress-logger)](https://crates.io/crates/dsi-progress-logger/reverse_dependencies)
 ![GitHub CI](https://github.com/vigna/dsi-progress-logger-rs/actions/workflows/rust.yml/badge.svg)
 ![license](https://img.shields.io/crates/l/dsi-progress-logger)
+[![](https://tokei.rs/b1/github/vigna/dsi-progress-logger-rs?type=Rust,Python)](https://github.com/vigna/dsi-progress-logger-rs)
+[![Latest version](https://img.shields.io/crates/v/dsi-progress-logger.svg)](https://crates.io/crates/dsi-progress-logger)
+[![Documentation](https://docs.rs/dsi-progress-logger/badge.svg)](https://docs.rs/dsi-progress-logger)
+
 
 A tunable progress logger to log progress information about long-running activities.
 
