@@ -1,0 +1,46 @@
+/*
+ * SPDX-FileCopyrightText: 2023 Inria
+ * SPDX-FileCopyrightText: 2023 Sebastiano Vigna
+ *
+ * SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
+ */
+
+use dsi_progress_logger::*;
+use log::info;
+use std::thread;
+use stderrlog;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    stderrlog::new()
+        .verbosity(2)
+        .show_module_names(true)
+        .timestamp(stderrlog::Timestamp::Second)
+        .init()?;
+
+    let mut pl = ProgressLogger::default();
+    pl.item_name("pumpkin").log_target("slow smashing");
+
+    pl.start("Smashing pumpkins (slowly)...");
+    for _ in 0..30 {
+        thread::sleep(std::time::Duration::from_millis(1000));
+        pl.update();
+    }
+    pl.done();
+
+    info!("");
+
+    let mut pl = ProgressLogger::default();
+    pl.display_memory(true)
+        .item_name("pumpkin")
+        .local_speed(true)
+        .log_target("fast smashing");
+
+    pl.start("Smashing pumpkins...");
+    for _ in 0..300 {
+        thread::sleep(std::time::Duration::from_millis(100));
+        pl.update();
+    }
+    pl.done();
+
+    Ok(())
+}
