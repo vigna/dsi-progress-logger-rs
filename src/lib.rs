@@ -65,6 +65,9 @@ pub trait ProgressLog {
     /// This should often be the path of the module logging progress,
     /// which is obtained with [`std::module_path!`].
     ///
+    /// Note that the macro [`progress_logger!`] sets this field automatically
+    /// to [`std::module_path!`].
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -142,7 +145,7 @@ pub trait ProgressLog {
     ///
     /// stderrlog::new().verbosity(2).init()?;
     /// let logger_name = "my_logger";
-    /// let mut pl = ProgressLogger::default();
+    /// let mut pl = progress_logger![];
     /// pl.info(format_args!("My logger named {}", logger_name));
     /// #     Ok(())
     /// # }
@@ -313,6 +316,20 @@ pub struct ProgressLogger {
     system: Option<System>,
     /// The pid of the current process
     pid: Pid,
+}
+
+#[macro_export]
+macro_rules! progress_logger {
+    ($($method:ident = $arg:expr),* $(,)?) => {
+        {
+            let mut pl = dsi_progress_logger::ProgressLogger::default();
+            pl.log_target(std::module_path!());
+            $(
+                pl.$method($arg);
+            )*
+            pl
+        }
+    }
 }
 
 impl Default for ProgressLogger {
@@ -611,5 +628,5 @@ impl Display for ProgressLogger {
 }
 
 pub mod prelude {
-    pub use super::{ProgressLog, ProgressLogger};
+    pub use super::{progress_logger, ProgressLog, ProgressLogger};
 }

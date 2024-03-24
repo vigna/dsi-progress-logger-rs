@@ -8,7 +8,6 @@
 [![Latest version](https://img.shields.io/crates/v/dsi-progress-logger.svg)](https://crates.io/crates/dsi-progress-logger)
 [![Documentation](https://docs.rs/dsi-progress-logger/badge.svg)](https://docs.rs/dsi-progress-logger)
 
-
 A tunable progress logger to log progress information about long-running activities.
 
 It is a port of the Java class [`it.unimi.dsi.util.ProgressLogger`] from the
@@ -58,8 +57,30 @@ A typical call sequence to a progress logger is as follows:
 use dsi_progress_logger::prelude::*;
 
 stderrlog::new().verbosity(2).init()?;
+
 let mut pl = ProgressLogger::default();
 pl.item_name("pumpkin");
+pl.start("Smashing pumpkins...");
+for _ in 0..100 {
+   // do something on each pumpkin
+   pl.update();
+}
+pl.done();
+#     Ok(())
+# }
+```
+
+There is however a macro [`progress_logger`] that will create the progress
+logger for you and set its [`log_target`] to [`std::module_path!()`], which
+is usually what you want. You may also call any setter with a key-value syntax:
+
+```rust
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use dsi_progress_logger::prelude::*;
+
+stderrlog::new().verbosity(2).init()?;
+
+let mut pl = progress_logger![item_name="pumpkin"];
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
    // do something on each pumpkin
@@ -77,8 +98,8 @@ A progress logger can also be used as a handy timer:
 use dsi_progress_logger::prelude::*;
 
 stderrlog::new().verbosity(2).init()?;
-let mut pl = ProgressLogger::default();
-pl.item_name("pumpkin");
+
+let mut pl = progress_logger![item_name="pumpkin"];
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
    // do something on each pumpkin
@@ -95,8 +116,8 @@ This progress logger will display information about  memory usage:
 use dsi_progress_logger::prelude::*;
 
 stderrlog::new().verbosity(2).init()?;
-let mut pl = ProgressLogger::default();
-pl.display_memory(true);
+
+let mut pl = progress_logger![display_memory=true];
 #     Ok(())
 # }
 ```
@@ -149,3 +170,5 @@ the NRRP MUR program funded by the EU - NGEU.
 [DSI Utilities]: https://dsiutils.di.unimi.it/
 [`log`]: https://docs.rs/log
 [`Instant::now()`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
+[`progress_logger`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
+[`log_target`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.log_target>

@@ -16,6 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .timestamp(stderrlog::Timestamp::Second)
         .init()?;
 
+    // Chained-setter initialization
     let mut pl = ProgressLogger::default();
     pl.item_name("pumpkin");
 
@@ -28,10 +29,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("");
 
-    let mut pl = ProgressLogger::default();
-    pl.display_memory(true)
-        .item_name("pumpkin")
-        .local_speed(true);
+    // Macro initialization
+    let mut pl = progress_logger![
+        item_name = "pumpkin",
+        display_memory = true,
+        local_speed = true
+    ];
 
     pl.start("Smashing pumpkins (slowly) and showing memory and local speed...");
     for _ in 0..30 {
