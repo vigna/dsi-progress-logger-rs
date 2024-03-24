@@ -60,6 +60,11 @@ pub trait ProgressLog {
     /// Set whether to display additionally the speed achieved during the last log interval.
     fn local_speed(&mut self, local_speed: bool) -> &mut Self;
 
+    /// Set the [`log`] target.
+    ///
+    /// This should often be the path of the module logging progress.
+    fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self;
+
     /// Start the logger, displaying the given message.
     ///
     /// You can pass the empty string to display nothing.
@@ -170,6 +175,13 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         self
     }
 
+    fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self {
+        if let Some(pl) = self {
+            pl.log_target(target);
+        }
+        self
+    }
+
     fn start(&mut self, msg: impl AsRef<str>) {
         if let Some(pl) = self {
             pl.start(msg);
@@ -259,6 +271,10 @@ pub struct ProgressLogger {
     time_unit: Option<TimeUnit>,
     /// Display additionally the speed achieved during the last log interval.
     local_speed: bool,
+    /// [`log`] target
+    ///
+    /// This is often the path of the module logging progress.
+    log_target: String,
     /// When the logger was started.
     start_time: Option<Instant>,
     /// The last time we logged the activity (to compute speed).
@@ -285,6 +301,13 @@ impl Default for ProgressLogger {
             expected_updates: None,
             time_unit: None,
             local_speed: false,
+            log_target: std::env::current_exe()
+                .ok()
+                .and_then(|path| {
+                    path.file_name()
+                        .and_then(|s| s.to_owned().into_string().ok())
+                })
+                .unwrap_or_else(|| "main".to_string()),
             start_time: None,
             last_log_time: Instant::now(),
             next_log_time: Instant::now(),
@@ -305,7 +328,7 @@ impl ProgressLogger {
 
     fn log(&mut self, now: Instant) {
         self.refresh();
-        info!("{}", self);
+        info!(target: &self.log_target, "{}", self);
         self.last_count = self.count;
         self.last_log_time = now;
         self.next_log_time = now + self.log_interval;
@@ -383,6 +406,11 @@ impl ProgressLog for ProgressLogger {
         self
     }
 
+    fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self {
+        self.log_target = target.as_ref().into();
+        self
+    }
+
     fn start(&mut self, msg: impl AsRef<str>) {
         let now = Instant::now();
         self.start_time = Some(now);
@@ -392,7 +420,7 @@ impl ProgressLog for ProgressLogger {
         self.last_log_time = now;
         self.next_log_time = now + self.log_interval;
         if !msg.as_ref().is_empty() {
-            info!("{}", msg.as_ref());
+            info!(target: &self.log_target, "{}", msg.as_ref());
         }
     }
 
@@ -433,11 +461,11 @@ impl ProgressLog for ProgressLogger {
 
     fn done(&mut self) {
         self.stop();
-        info!("Completed.");
+        info!(target: &self.log_target, "Completed.");
         // just to avoid wrong reuses
         self.expected_updates = None;
         self.refresh();
-        info!("{}", self);
+        info!(target: &self.log_target, "{}", self);
     }
 
     fn done_with_count(&mut self, count: usize) {
@@ -450,7 +478,7 @@ impl ProgressLog for ProgressLogger {
     }
 
     fn info(&self, args: Arguments<'_>) {
-        info!("{}", std::fmt::format(args));
+        info!(target: &self.log_target, "{}", std::fmt::format(args));
     }
 
     #[allow(clippy::manual_map)]
