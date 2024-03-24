@@ -62,7 +62,29 @@ pub trait ProgressLog {
 
     /// Set the [`log`] target.
     ///
-    /// This should often be the path of the module logging progress.
+    /// This should often be the path of the module logging progress,
+    /// which is obtained with [`std::module_path!`].
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use dsi_progress_logger::prelude::*;
+    ///
+    /// stderrlog::new().verbosity(2).init()?;
+    /// let mut pl = ProgressLogger::default();
+    /// pl.item_name("pumpkin");
+    /// pl.log_target(std::module_path!());
+    /// pl.start("Smashing pumpkins from a module...");
+    /// for _ in 0..100 {
+    ///    // do something on each pumpkin
+    ///    pl.update();
+    /// }
+    /// pl.done();
+    /// #     Ok(())
+    /// # }
+    /// ```
+
     fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self;
 
     /// Start the logger, displaying the given message.
