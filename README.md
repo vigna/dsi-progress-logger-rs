@@ -19,11 +19,11 @@ There is a [`ProgressLog`] trait and a default implementation
 
 To log the progress of an activity, you call [`start`]. Then, each time you want
 to mark progress, you call [`update`], which increases the item counter, and
-will log progress information if enough time has passed since the last log. The
-time check happens (in the case of [`ProgressLogger`]) only on multiples of
-[`LIGHT_UPDATE_MASK`] + 1 in the case of [`light_update`], which should be used
-when the activity has an extremely low cost that is comparable to that of the
-time check (a call to [`Instant::now()`] itself.
+will log progress information if enough time has passed since the last log.
+[`light_update`] will perform a time check only on updates multiples of
+[`LIGHT_UPDATE_MASK`] + 1; it  should be used when the activity has an extremely
+low cost that is comparable to that of the time check (a call to
+[`Instant::now()`] itself.
 
 A few setters can be called at any time to customize the logger (e.g.,
 [`item_name`], [`log_interval`], [`expected_updates`], etc.). The setters take
@@ -31,7 +31,8 @@ and return a mutable reference to the logger, so you must first assign the
 logger to a variable, and then you can chain-call the setters on the variable in
 fluent style. The disadvantage of this approach is that you must assign the
 logger to a variable, but the advantage is that you can call any setter without
-having to reassign the variable holding the logger.
+having to reassign the variable holding the logger. There is also a
+[`progress_logger!`] macro described later.
 
 It is also possible to log used and free memory at each log interval by calling
 [`display_memory`]. Memory is read from system data by the [`sysinfo`] crate,
@@ -70,9 +71,9 @@ pl.done();
 # }
 ```
 
-There is however a macro [`progress_logger`] that will create the progress
-logger for you and set its [`log_target`] to [`std::module_path!()`], which
-is usually what you want. You may also call any setter with a key-value syntax:
+The [`progress_logger`] macro will create the progress logger for you and set
+its [`log_target`] to [`std::module_path!()`], which is usually what you want.
+You may also call any setter with a key-value syntax:
 
 ```rust
 # fn main() -> Result<(), Box<dyn std::error::Error>> {

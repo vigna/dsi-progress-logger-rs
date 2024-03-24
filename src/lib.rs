@@ -27,7 +27,7 @@ pass as a [`ProgressLog`] either a [`ProgressLogger`], an `Option<ProgressLogger
 
 */
 pub trait ProgressLog {
-    /// Display memory information.
+    /// Sets the display of memory information.
     ///
     /// Memory information include:
     /// - the [resident-set size](sysinfo::Process::memory) of the process that created the logger;
@@ -37,20 +37,20 @@ pub trait ProgressLog {
     /// - the [total amount](sysinfo::System::total_memory) of memory.
     fn display_memory(&mut self, display_memory: bool) -> &mut Self;
 
-    /// Set the name of an item.
+    /// Sets the name of an item.
     fn item_name(&mut self, item_name: impl AsRef<str>) -> &mut Self;
 
-    /// Set the log interval.
+    /// Sets the log interval.
     fn log_interval(&mut self, log_interval: Duration) -> &mut Self;
 
-    /// Set the expected number of updates.
+    /// Sets the expected number of updates.
     ///
     /// If not [`None`],
     /// the logger will display the percentage of completion and
     /// an estimate of the time to completion.
     fn expected_updates(&mut self, expected_updates: Option<usize>) -> &mut Self;
 
-    /// Set the time unit to use for speed.
+    /// Sets the time unit to use for speed.
     ///
     /// If not [`None`], the logger will always display the speed in this unit
     /// instead of making a choice of readable unit based on the elapsed time. Moreover, large numbers
@@ -60,7 +60,7 @@ pub trait ProgressLog {
     /// Set whether to display additionally the speed achieved during the last log interval.
     fn local_speed(&mut self, local_speed: bool) -> &mut Self;
 
-    /// Set the [`log`] target.
+    /// Sets the [`log`] target.
     ///
     /// This should often be the path of the module logging progress,
     /// which is obtained with [`std::module_path!`].
@@ -75,6 +75,7 @@ pub trait ProgressLog {
     /// use dsi_progress_logger::prelude::*;
     ///
     /// stderrlog::new().verbosity(2).init()?;
+    ///
     /// let mut pl = ProgressLogger::default();
     /// pl.item_name("pumpkin");
     /// pl.log_target(std::module_path!());
@@ -90,60 +91,68 @@ pub trait ProgressLog {
 
     fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self;
 
-    /// Start the logger, displaying the given message.
+    /// Starts the logger, displaying the given message.
     ///
     /// You can pass the empty string to display nothing.
     fn start(&mut self, msg: impl AsRef<str>);
 
-    /// Increase the count and check whether it is time to log.
+    /// Increases the count and check whether it is time to log.
     fn update(&mut self);
 
-    /// Set the count and check whether it is time to log.
+    /// Sets the count and check whether it is time to log.
     fn update_with_count(&mut self, count: usize);
 
-    /// Increase the count but check whether it is time log only after an
+    /// Increases the count but checks whether it is time log only after an
     /// implementation-defined number of calls.
     ///
-    /// Useful for very short activities with respect to which  checking the time is expensive.
+    /// Useful for very short activities with respect to which  checking the
+    /// time is expensive.
     fn light_update(&mut self);
 
-    /// Increase the count and force a log.
+    /// Increases the count and forces a log.
     fn update_and_display(&mut self);
 
-    /// Stop the logger, fixing the final time.
+    /// Stops the logger, fixing the final time.
     fn stop(&mut self);
 
-    /// Stop the logger, print `Completed.`, and display the final stats.
-    /// The number of expected updates will be cleared.
+    /// Stops the logger, print `Completed.`, and display the final stats. The
+    /// number of expected updates will be cleared.
     fn done(&mut self);
 
-    /// Stop the logger, set the count, print `Completed.`, and display the final stats.
-    /// The number of expected updates will be cleared.
+    /// Stops the logger, sets the count, prints `Completed.`, and displays the
+    /// final stats. The number of expected updates will be cleared.
     ///
     /// This method is particularly useful in two circumstances:
-    /// * you have updated the logger with some approximate values (e.g., in a multicore computation) but before
-    ///   printing the final stats you want the internal counter to contain an exact value;
-    /// * you have used the logger as a handy timer, calling just [`start`](#fields.start) and this method.
+    /// * you have updated the logger with some approximate values (e.g., in a
+    ///   multicore computation) but before printing the final stats you want
+    ///   the internal counter to contain an exact value;
+    /// * you have used the logger as a handy timer, calling just
+    ///   [`start`](#fields.start) and this method.
     fn done_with_count(&mut self, count: usize);
 
-    /// Return the elapsed time since the logger was started, or `None` if the logger has not been started.
+    /// Returns the elapsed time since the logger was started, or `None` if the
+    /// logger has not been started.
     fn elapsed(&self) -> Option<Duration>;
 
-    /// Refresh memory information, if previously requested with [`display_memory`](#method.display_memory).
-    /// You do not need to call this method unless you display the logger manually.
+    /// Refreshes memory information, if previously requested with
+    /// [`display_memory`](#method.display_memory). You do not need to call this
+    /// method unless you display the logger manually.
     fn refresh(&mut self);
 
-    /// Output the given message.
+    /// Outputs the given message.
     ///
-    /// For maximum flexibility, this method takes as argument the result of a [`std::format_args!`] macro.
-    /// Note that there will be no output if the logger is the `None` variant.
+    /// For maximum flexibility, this method takes as argument the result of a
+    /// [`std::format_args!`] macro. Note that there will be no output if the
+    /// logger is the [`None`] variant.
     ///
-    /// # Example
+    /// # Examples
+    ///
     /// ```rust
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// use dsi_progress_logger::*;
     ///
     /// stderrlog::new().verbosity(2).init()?;
+    ///
     /// let logger_name = "my_logger";
     /// let mut pl = progress_logger![];
     /// pl.info(format_args!("My logger named {}", logger_name));
@@ -152,7 +161,8 @@ pub trait ProgressLog {
     /// ```
     fn info(&self, args: Arguments<'_>);
 
-    /// Clone the logger, returning a logger with the same setup but with all the counters reset.
+    /// Clones the logger, returning a logger with the same setup but with all
+    /// the counters reset.
     fn clone(&self) -> Self;
 }
 
@@ -192,7 +202,8 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         self
     }
 
-    /// Set whether to display additionally the speed achieved during the last log interval.
+    /// Sets whether to display additionally the speed achieved during the last
+    /// log interval.
     fn local_speed(&mut self, local_speed: bool) -> &mut Self {
         if let Some(pl) = self {
             pl.local_speed(local_speed);
@@ -278,8 +289,8 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
 
 /**
 
-An implementation of [`ProgressLog`] with output generated using the [`log`](https://docs.rs/log) crate
-at the `info` level.
+An implementation of [`ProgressLog`] with output generated using
+the [`log`](https://docs.rs/log) crate at the `info` level.
 
 */
 pub struct ProgressLogger {
@@ -317,6 +328,18 @@ pub struct ProgressLogger {
     /// The pid of the current process
     pid: Pid,
 }
+
+/// Macro to create a [`ProgressLogger`] with default log target set to
+/// [`std::module_path!`], and key-value pairs instead of setters.
+///
+/// # Examples
+///
+///
+/// ```rust
+/// use dsi_progress_logger::prelude::*;
+///
+/// let mut pl = progress_logger![item_name="pumpkin", display_memory=true];
+/// ```
 
 #[macro_export]
 macro_rules! progress_logger {
@@ -361,8 +384,8 @@ impl Default for ProgressLogger {
 
 impl ProgressLogger {
     /// Calls to [light_update](#method.light_update) will cause a call to
-    /// [`Instant::now`] only if the current count
-    /// is a multiple of this mask plus one.
+    /// [`Instant::now`] only if the current count is a multiple of this mask
+    /// plus one.
     pub const LIGHT_UPDATE_MASK: usize = (1 << 20) - 1;
 
     fn log(&mut self, now: Instant) {
@@ -406,7 +429,6 @@ impl ProgressLogger {
 }
 
 impl ProgressLog for ProgressLogger {
-    /// Chainable setter enabling memory display.
     fn display_memory(&mut self, display_memory: bool) -> &mut Self {
         match (display_memory, &self.system) {
             (true, None) => {
@@ -479,7 +501,9 @@ impl ProgressLog for ProgressLogger {
         self.log_if();
     }
 
-    /// Increase the count and, once every [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, check whether it is time to log.
+    /// Increases the count and, once every
+    /// [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, check
+    /// whether it is time to log.
     #[inline(always)]
     fn light_update(&mut self) {
         self.count += 1;
