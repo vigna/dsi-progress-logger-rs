@@ -81,7 +81,7 @@ use dsi_progress_logger::prelude::*;
 
 stderrlog::new().verbosity(2).init()?;
 
-let mut pl = progress_logger![item_name="pumpkin"];
+let mut pl = progress_logger!(item_name="pumpkin");
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
    // do something on each pumpkin
@@ -100,7 +100,7 @@ use dsi_progress_logger::prelude::*;
 
 stderrlog::new().verbosity(2).init()?;
 
-let mut pl = progress_logger![item_name="pumpkin"];
+let mut pl = progress_logger!(item_name="pumpkin");
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
    // do something on each pumpkin
@@ -118,7 +118,7 @@ use dsi_progress_logger::prelude::*;
 
 stderrlog::new().verbosity(2).init()?;
 
-let mut pl = progress_logger![display_memory=true];
+let mut pl = progress_logger!(display_memory=true);
 #     Ok(())
 # }
 ```

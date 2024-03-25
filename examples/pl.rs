@@ -30,11 +30,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("");
 
     // Macro initialization
-    let mut pl = progress_logger![
+    let mut pl = progress_logger!(
         item_name = "pumpkin",
         display_memory = true,
         local_speed = true
-    ];
+    );
 
     pl.start("Smashing pumpkins (slowly) and showing memory and local speed...");
     for _ in 0..30 {

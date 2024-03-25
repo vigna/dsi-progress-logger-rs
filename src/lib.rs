@@ -154,7 +154,7 @@ pub trait ProgressLog {
     /// stderrlog::new().verbosity(2).init()?;
     ///
     /// let logger_name = "my_logger";
-    /// let mut pl = progress_logger![];
+    /// let mut pl = progress_logger!();
     /// pl.info(format_args!("My logger named {}", logger_name));
     /// #     Ok(())
     /// # }
@@ -338,7 +338,7 @@ pub struct ProgressLogger {
 /// ```rust
 /// use dsi_progress_logger::prelude::*;
 ///
-/// let mut pl = progress_logger![item_name="pumpkin", display_memory=true];
+/// let mut pl = progress_logger!(item_name="pumpkin", display_memory=true);
 /// ```
 
 #[macro_export]
