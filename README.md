@@ -8,7 +8,8 @@
 [![Latest version](https://img.shields.io/crates/v/dsi-progress-logger.svg)](https://crates.io/crates/dsi-progress-logger)
 [![Documentation](https://docs.rs/dsi-progress-logger/badge.svg)](https://docs.rs/dsi-progress-logger)
 
-A tunable progress logger to log progress information about long-running activities.
+A tunable progress logger to log progress information about long-running
+activities.
 
 It is a port of the Java class [`it.unimi.dsi.util.ProgressLogger`] from the
 [DSI Utilities]. Logging is based on the standard [`log`] crate at the `info`
@@ -125,27 +126,30 @@ let mut pl = progress_logger!(display_memory=true);
 
 ## Optional logging
 
-This crate supports optional logging by implementing [`ProgressLog`] for `Option<ProgressLog>` as a no-op.
-As a result, you can pass to functions an argument `pl` that is an `impl ProgressLog`, with the following behavior:
+This crate supports optional logging by implementing [`ProgressLog`] for
+`Option<ProgressLog>` as a no-op. As a result, you can pass to functions an
+argument `pl` that is an `impl ProgressLog`, with the following behavior:
 
-- if you pass a [`ProgressLogger`], the progress logger will be used, without any check;
+- if you pass a (mutable reference to a) [`ProgressLogger`], the progress logger
+  will be used, without any check;
 - if you pass `Option::<ProgressLogger>::None`, no logging will be performed, and in fact the logging
   code should be entirely optimized away by the compiler;
-- if you pass an `Option<ProgressLogger>`, logging will happen depending on the variant, and there
-  will be a runtime check for each call to `pl`.
+- if you pass an `Option<ProgressLogger>` or `Option<&mut ProgressLogger>`,
+  logging will happen depending on the variant, and there will be a runtime
+  check for each call.
 
-There is an [`info`] method that can be used to log information to the logger
-at the `info` level.
-The advantage of using [`info`] is that the
-logging will be optional depending on the type of the logger.
+There is an [`info`] method that can be used to log information to the logger at
+the `info` level. The advantage of using [`info`] is that the logging will be
+optional depending on the type of the logger.
 
 ## Cloning
 
-The [`clone`] method will return a logger with the same setup but with all the counters reset.
-This is useful when you want to configure a logger and then use its configuration for other loggers.
+The [`clone`] method will return a logger with the same setup but with all the
+counters reset. This is useful when you want to configure a logger and then use
+its configuration for other loggers.
 
-Note that this method is part of [`ProgressLog`]: otherwise, because of the orphan rule
-we would not be able to implement it for `Option<ProgressLog>`.
+Note that this method is part of [`ProgressLog`]: otherwise, because of the
+orphan rule we would not be able to implement it for `Option<ProgressLog>`.
 
 ## Acknowledgments
 
