@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 
 mod utils;
-use utils::*;
+pub use utils::*;
 
 /**
 
