@@ -14,6 +14,8 @@ use std::fmt::{Arguments, Display, Formatter, Result};
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 
+mod buffered;
+pub use buffered::*;
 mod utils;
 pub use utils::*;
 
@@ -21,12 +23,39 @@ pub use utils::*;
 
 Logging trait.
 
-Implemented by [`ProgressLog`] and by `Option<ProgressLog>`. This approach makes it possible to
-pass as a [`ProgressLog`] either a [`ProgressLogger`], an `Option<ProgressLogger>`, or even
+Implemented by [`ProgressLogConfig`] and by `Option<ProgressLogConfig>`. This approach makes it possible to
+pass as a [`ProgressLogConfig`] either a [`ProgressLogger`], an `Option<ProgressLogger>`, or even
 `Option::<ProgressLogger>::None`.
 
 */
 pub trait ProgressLog {
+    /// Increases the count and check whether it is time to log.
+    fn update(&mut self);
+
+    /// Sets the count and check whether it is time to log.
+    fn update_with_count(&mut self, count: usize);
+
+    /// Increases the count but checks whether it is time log only after an
+    /// implementation-defined number of calls.
+    ///
+    /// Useful for very short activities with respect to which  checking the
+    /// time is expensive.
+    fn light_update(&mut self);
+
+    /// Increases the count and forces a log.
+    fn update_and_display(&mut self);
+}
+
+/**
+
+Logging configuration trait.
+
+Implemented by [`ProgressLogConfig`] and by `Option<ProgressLogConfig>`. This approach makes it possible to
+pass as a [`ProgressLogConfig`] either a [`ProgressLogger`], an `Option<ProgressLogger>`, or even
+`Option::<ProgressLogger>::None`.
+
+*/
+pub trait ProgressLogConfig: ProgressLog {
     /// Sets the display of memory information.
     ///
     /// Memory information include:
@@ -96,22 +125,6 @@ pub trait ProgressLog {
     /// You can pass the empty string to display nothing.
     fn start(&mut self, msg: impl AsRef<str>);
 
-    /// Increases the count and check whether it is time to log.
-    fn update(&mut self);
-
-    /// Sets the count and check whether it is time to log.
-    fn update_with_count(&mut self, count: usize);
-
-    /// Increases the count but checks whether it is time log only after an
-    /// implementation-defined number of calls.
-    ///
-    /// Useful for very short activities with respect to which  checking the
-    /// time is expensive.
-    fn light_update(&mut self);
-
-    /// Increases the count and forces a log.
-    fn update_and_display(&mut self);
-
     /// Stops the logger, fixing the final time.
     fn stop(&mut self);
 
@@ -167,6 +180,31 @@ pub trait ProgressLog {
 }
 
 impl<P: ProgressLog> ProgressLog for Option<P> {
+    fn update(&mut self) {
+        if let Some(pl) = self {
+            pl.update();
+        }
+    }
+
+    fn update_with_count(&mut self, count: usize) {
+        if let Some(pl) = self {
+            pl.update_with_count(count);
+        }
+    }
+
+    fn light_update(&mut self) {
+        if let Some(pl) = self {
+            pl.light_update();
+        }
+    }
+
+    fn update_and_display(&mut self) {
+        if let Some(pl) = self {
+            pl.update_and_display();
+        }
+    }
+}
+impl<P: ProgressLogConfig> ProgressLogConfig for Option<P> {
     fn display_memory(&mut self, display_memory: bool) -> &mut Self {
         if let Some(pl) = self {
             pl.display_memory(display_memory);
@@ -224,30 +262,6 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         }
     }
 
-    fn update(&mut self) {
-        if let Some(pl) = self {
-            pl.update();
-        }
-    }
-
-    fn update_with_count(&mut self, count: usize) {
-        if let Some(pl) = self {
-            pl.update_with_count(count);
-        }
-    }
-
-    fn light_update(&mut self) {
-        if let Some(pl) = self {
-            pl.light_update();
-        }
-    }
-
-    fn update_and_display(&mut self) {
-        if let Some(pl) = self {
-            pl.update_and_display();
-        }
-    }
-
     fn stop(&mut self) {
         if let Some(pl) = self {
             pl.stop();
@@ -289,7 +303,7 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
 
 /**
 
-An implementation of [`ProgressLog`] with output generated using
+An implementation of [`ProgressLogConfig`] with output generated using
 the [`log`](https://docs.rs/log) crate at the `info` level.
 
 */
@@ -429,6 +443,34 @@ impl ProgressLogger {
 }
 
 impl ProgressLog for ProgressLogger {
+    fn update(&mut self) {
+        self.count += 1;
+        self.log_if();
+    }
+
+    fn update_with_count(&mut self, count: usize) {
+        self.count += count;
+        self.log_if();
+    }
+
+    /// Increases the count and, once every
+    /// [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, check
+    /// whether it is time to log.
+    #[inline(always)]
+    fn light_update(&mut self) {
+        self.count += 1;
+        if (self.count & Self::LIGHT_UPDATE_MASK) == 0 {
+            self.log_if();
+        }
+    }
+
+    fn update_and_display(&mut self) {
+        self.count += 1;
+        self.log(Instant::now());
+    }
+}
+
+impl ProgressLogConfig for ProgressLogger {
     fn display_memory(&mut self, display_memory: bool) -> &mut Self {
         match (display_memory, &self.system) {
             (true, None) => {
@@ -489,32 +531,6 @@ impl ProgressLog for ProgressLogger {
         if let Some(system) = &mut self.system {
             system.refresh_process_specifics(self.pid, ProcessRefreshKind::new());
         }
-    }
-
-    fn update(&mut self) {
-        self.count += 1;
-        self.log_if();
-    }
-
-    fn update_with_count(&mut self, count: usize) {
-        self.count += count;
-        self.log_if();
-    }
-
-    /// Increases the count and, once every
-    /// [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, check
-    /// whether it is time to log.
-    #[inline(always)]
-    fn light_update(&mut self) {
-        self.count += 1;
-        if (self.count & Self::LIGHT_UPDATE_MASK) == 0 {
-            self.log_if();
-        }
-    }
-
-    fn update_and_display(&mut self) {
-        self.count += 1;
-        self.log(Instant::now());
     }
 
     fn stop(&mut self) {
@@ -652,5 +668,5 @@ impl Display for ProgressLogger {
 }
 
 pub mod prelude {
-    pub use super::{progress_logger, ProgressLog, ProgressLogger};
+    pub use super::{progress_logger, ProgressLog, ProgressLogConfig, ProgressLogger};
 }
