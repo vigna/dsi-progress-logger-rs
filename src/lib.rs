@@ -345,10 +345,10 @@ pub struct ProgressLogger {
 macro_rules! progress_logger {
     ($($method:ident = $arg:expr),* $(,)?) => {
         {
-            let mut pl = dsi_progress_logger::ProgressLogger::default();
-            pl.log_target(std::module_path!());
+            let mut pl = ::dsi_progress_logger::ProgressLogger::default();
+            ::dsi_progress_logger::ProgressLog::log_target(&mut pl, ::std::module_path!());
             $(
-                pl.$method($arg);
+                ::dsi_progress_logger::ProgressLog::$method(&mut pl, $arg);
             )*
             pl
         }
