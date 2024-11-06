@@ -132,8 +132,11 @@ argument `pl` that is an `impl ProgressLog`, with the following behavior:
 
 - if you pass a (mutable reference to a) [`ProgressLogger`], the progress logger
   will be used, without any check;
-- if you pass `Option::<ProgressLogger>::None`, no logging will be performed, and in fact the logging
-  code should be entirely optimized away by the compiler;
+- if you pass a (mutable reference to a) `Option::<ProgressLogger>::None`, no
+  logging will be performed, and in fact the logging code should be entirely
+  optimized away by the compiler; the macro [`no_logging!`], which expands
+  to  `Option::<ProgressLogger>::None`, can be used a convenient way to
+  switch off logging;
 - if you pass an `Option<ProgressLogger>` or `Option<&mut ProgressLogger>`,
   logging will happen depending on the variant, and there will be a runtime
   check for each call.
@@ -178,5 +181,6 @@ MUR can be held responsible for them.
 [DSI Utilities]: https://dsiutils.di.unimi.it/
 [`log`]: https://docs.rs/log
 [`Instant::now()`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
-[`progress_logger`]: https://doc.rust-lang.org/std/time/struct.Instant.html#method.now
+[`progress_logger!`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/macro.progress_logger.html
+[`no_logging!`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/macro.no_logging.html>
 [`log_target`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.log_target>

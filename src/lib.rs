@@ -651,6 +651,13 @@ impl Display for ProgressLogger {
     }
 }
 
+#[macro_export]
+macro_rules! no_logging {
+    () => {
+        Option::<dsi_progress_logger::ProgressLogger>::None
+    };
+}
+
 pub mod prelude {
-    pub use super::{progress_logger, ProgressLog, ProgressLogger};
+    pub use super::{no_logging, progress_logger, ProgressLog, ProgressLogger};
 }
