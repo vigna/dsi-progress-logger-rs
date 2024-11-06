@@ -127,19 +127,18 @@ let mut pl = progress_logger!(display_memory=true);
 ## Optional logging
 
 This crate supports optional logging by implementing [`ProgressLog`] for
-`Option<ProgressLog>` as a no-op. As a result, you can pass to functions an
-argument `pl` that is an `impl ProgressLog`, with the following behavior:
+`Option<ProgressLog>::None` as a no-op. As a result, you can pass to functions an
+argument `pl` that is a `&mut impl ProgressLog`, with the following behavior:
 
-- if you pass a (mutable reference to a) [`ProgressLogger`], the progress logger
-  will be used, without any check;
-- if you pass a (mutable reference to a) `Option::<ProgressLogger>::None`, no
+- if you pass a `&mut ProgressLogger`, the progress logger will be used, without
+  any check;
+- if you pass a `&mut Option::<ProgressLogger>::None`, no
   logging will be performed, and in fact the logging code should be entirely
   optimized away by the compiler; the macro [`no_logging!`], which expands
-  to  `Option::<ProgressLogger>::None`, can be used a convenient way to
+  to `&mut Option::<ProgressLogger>::None`, can be used a convenient way to
   switch off logging;
-- if you pass an `Option<ProgressLogger>` or `Option<&mut ProgressLogger>`,
-  logging will happen depending on the variant, and there will be a runtime
-  check for each call.
+- if you pass an `&mut Option<ProgressLogger>`, logging will happen depending on
+  the variant, and there will be a runtime check for each call.
 
 There is an [`info`] method that can be used to log information to the logger at
 the `info` level. The advantage of using [`info`] is that the logging will be

@@ -654,7 +654,7 @@ impl Display for ProgressLogger {
 #[macro_export]
 macro_rules! no_logging {
     () => {
-        Option::<dsi_progress_logger::ProgressLogger>::None
+        &mut Option::<dsi_progress_logger::ProgressLogger>::None
     };
 }
 
