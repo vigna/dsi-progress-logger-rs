@@ -4,7 +4,7 @@
 
 ### New - 2025-01-09
 
-* New `ConcurrentProgressLogger` structure that makes it possible to
+* New `ConcurrentWrapper` structure that makes it possible to
   log from multiple threads.
 
 ## [0.2.5] - 2024-11-06
