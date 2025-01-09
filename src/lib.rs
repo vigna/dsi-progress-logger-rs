@@ -809,6 +809,16 @@ impl<P: ProgressLog> ConcurrentProgressLogger<P> {
             .update_with_count(self.local_count as _);
         self.local_count = 0;
     }
+
+    /// Creates a new [`ConcurrentProgressLogger`] with the same underlying
+    /// logger.
+    pub fn spawn(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            local_count: 0,
+            threshold: self.threshold,
+        }
+    }
 }
 
 impl<P: ProgressLog> ProgressLog for ConcurrentProgressLogger<P> {
@@ -944,7 +954,7 @@ impl<P: ProgressLog> ProgressLog for ConcurrentProgressLogger<P> {
 
     fn clone(&self) -> Self {
         Self {
-            inner: self.inner.clone(),
+            inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())),
             local_count: 0,
             threshold: self.threshold,
         }
