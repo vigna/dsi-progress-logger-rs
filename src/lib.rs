@@ -11,9 +11,9 @@ use log::info;
 use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
 use std::fmt::{Arguments, Display, Formatter, Result};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
-
 mod utils;
 pub use utils::*;
 
@@ -27,6 +27,16 @@ pass as a [`ProgressLog`] either a [`ProgressLogger`], an `Option<ProgressLogger
 
 */
 pub trait ProgressLog {
+    /// Forces a log of `self` assuming `now` is the current time.
+    ///
+    /// This is a low-level method that should not be called directly.
+    fn log(&mut self, now: Instant);
+
+    /// Logs `self` if it is time to log.
+    ///
+    /// This is a low-level method that should not be called directly.
+    fn log_if(&mut self);
+
     /// Sets the display of memory information.
     ///
     /// Memory information include:
@@ -74,7 +84,9 @@ pub trait ProgressLog {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// use dsi_progress_logger::prelude::*;
     ///
-    /// stderrlog::new().verbosity(2).init()?;
+    ///    env_logger::builder()
+    ///        .filter_level(log::LevelFilter::Info)
+    ///        .try_init()?;
     ///
     /// let mut pl = ProgressLogger::default();
     /// pl.item_name("pumpkin");
@@ -102,7 +114,7 @@ pub trait ProgressLog {
     /// Sets the count and check whether it is time to log.
     fn update_with_count(&mut self, count: usize);
 
-    /// Increases the count but checks whether it is time log only after an
+    /// Increases the count but checks whether it is time to log only after an
     /// implementation-defined number of calls.
     ///
     /// Useful for very short activities with respect to which  checking the
@@ -151,7 +163,9 @@ pub trait ProgressLog {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// use dsi_progress_logger::*;
     ///
-    /// stderrlog::new().verbosity(2).init()?;
+    ///    env_logger::builder()
+    ///        .filter_level(log::LevelFilter::Info)
+    ///        .try_init()?;
     ///
     /// let logger_name = "my_logger";
     /// let mut pl = progress_logger!();
@@ -163,10 +177,25 @@ pub trait ProgressLog {
 
     /// Clones the logger, returning a logger with the same setup but with all
     /// the counters reset.
+    ///
+    /// Note that we cannot simply implement the [`Clone`] trait because we will
+    /// need this method also for the [`Option`] variant.
     fn clone(&self) -> Self;
 }
 
 impl<P: ProgressLog> ProgressLog for Option<P> {
+    fn log(&mut self, now: Instant) {
+        if let Some(pl) = self {
+            pl.log(now);
+        }
+    }
+
+    fn log_if(&mut self) {
+        if let Some(pl) = self {
+            pl.log_if();
+        }
+    }
+
     fn display_memory(&mut self, display_memory: bool) -> &mut Self {
         if let Some(pl) = self {
             pl.display_memory(display_memory);
@@ -388,21 +417,6 @@ impl ProgressLogger {
     /// plus one.
     pub const LIGHT_UPDATE_MASK: usize = (1 << 20) - 1;
 
-    fn log(&mut self, now: Instant) {
-        self.refresh();
-        info!(target: &self.log_target, "{}", self);
-        self.last_count = self.count;
-        self.last_log_time = now;
-        self.next_log_time = now + self.log_interval;
-    }
-
-    fn log_if(&mut self) {
-        let now = Instant::now();
-        if self.next_log_time <= now {
-            self.log(now);
-        }
-    }
-
     fn fmt_timing_speed(&self, f: &mut Formatter<'_>, seconds_per_item: f64) -> Result {
         let items_per_second = 1.0 / seconds_per_item;
 
@@ -429,6 +443,21 @@ impl ProgressLogger {
 }
 
 impl ProgressLog for ProgressLogger {
+    fn log(&mut self, now: Instant) {
+        self.refresh();
+        info!(target: &self.log_target, "{}", self);
+        self.last_count = self.count;
+        self.last_log_time = now;
+        self.next_log_time = now + self.log_interval;
+    }
+
+    fn log_if(&mut self) {
+        let now = Instant::now();
+        if self.next_log_time <= now {
+            self.log(now);
+        }
+    }
+
     fn display_memory(&mut self, display_memory: bool) -> &mut Self {
         match (display_memory, &self.system) {
             (true, None) => {
@@ -651,6 +680,289 @@ impl Display for ProgressLogger {
     }
 }
 
+/// A concurrent implementation of [`ProgressLog`] with output generated using
+/// the [`log`](https://docs.rs/log) crate at the `info` level.
+///
+/// Instances can be cloned to give several threads their own logger. The
+/// methods [`update`](ProgressLog::update) and
+/// [`update_with_count`](ProgressLog::update_with_count) buffer the increment
+/// and add it to the underlying logger only when the buffer reaches a
+/// threshold; this prevents locking the underlying logger too often. The
+/// threshold is set at creation using the methods
+/// [`with_threshold`](Self::with_threshold) and
+/// [`wrap_with_threshold`](Self::wrap_with_threshold), or by
+/// calling the method [`threshold`](Self::threshold).
+///
+///
+/// The method [`light_update`](ProgressLog::light_update), as in the case of
+/// [`ProgressLogger`], further delays updates using an even faster check.
+
+pub struct ConcurrentProgressLogger<P: ProgressLog = ProgressLogger> {
+    /// An atomically reference counted, mutex-protected logger.
+    inner: Arc<Mutex<P>>,
+    /// The number of items processed by the current thread.
+    local_count: u32,
+    /// The threshold for updating the underlying logger.
+    threshold: u32,
+}
+
+/// Macro to create a [`ConcurrentProgressLogger`] with default log target set to
+/// [`std::module_path!`], and key-value pairs instead of setters.
+///
+/// # Examples
+///
+/// ```rust
+/// use dsi_progress_logger::prelude::*;
+///
+/// let mut pl = concurrent_progress_logger!(item_name="pumpkin", display_memory=true);
+/// ```
+
+#[macro_export]
+macro_rules! concurrent_progress_logger {
+    ($($method:ident = $arg:expr),* $(,)?) => {
+        {
+            let mut cpl = ::dsi_progress_logger::ConcurrentProgressLogger::default();
+            ::dsi_progress_logger::ProgressLog::log_target(&mut cpl, ::std::module_path!());
+            $(
+                ::dsi_progress_logger::ProgressLog::$method(&mut cpl, $arg);
+            )*
+            cpl
+        }
+    }
+}
+
+impl Default for ConcurrentProgressLogger {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(ProgressLogger::default())),
+            local_count: 0,
+            threshold: Self::DEFAULT_THRESHOLD,
+        }
+    }
+}
+
+impl ConcurrentProgressLogger {
+    /// Create a new [`ConcurrentProgressLogger`] wrapping a [`ProgressLogger`],
+    /// using the [default threshold](Self::DEFAULT_THRESHOLD).
+    pub fn new() -> Self {
+        Self::with_threshold(Self::DEFAULT_THRESHOLD)
+    }
+
+    /// Create a new [`ConcurrentProgressLogger`] wrapping a [`ProgressLogger`],
+    /// using the given threshold.
+    pub fn with_threshold(threshold: u32) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(ProgressLogger::default())),
+            local_count: 0,
+            threshold,
+        }
+    }
+}
+
+impl<P: ProgressLog> ConcurrentProgressLogger<P> {
+    /// The default threshold for updating the underlying logger.
+    pub const DEFAULT_THRESHOLD: u32 = 1 << 15;
+
+    /// Calls to [`light_update`](ProgressLog::light_update) will cause a call
+    /// to [`update_with_count`](ProgressLog::update_with_count) only if the
+    /// current local count is a multiple of this mask plus one.
+    ///
+    /// Note that this constant is significantly smaller than the one used in
+    /// [`ProgressLogger`], as updates will be further delayed by the threshold
+    /// mechanism.
+    pub const LIGHT_UPDATE_MASK: u32 = (1 << 10) - 1;
+
+    /// Set the threshold for updating the underlying logger.
+    ///
+    /// Note concurrent loggers with the same underlying logger
+    /// have independent thresholds.
+    pub fn threshold(&mut self, threshold: u32) -> &mut Self {
+        self.threshold = threshold;
+        self
+    }
+
+    /// Wrap a given [`ProgressLog`] in a [`ConcurrentProgressLogger`]
+    /// using the [default threshold](Self::DEFAULT_THRESHOLD).
+    pub fn wrap(inner: P) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(inner)),
+            local_count: 0,
+            threshold: Self::DEFAULT_THRESHOLD,
+        }
+    }
+
+    /// Wrap a given [`ProgressLog`] in a [`ConcurrentProgressLogger`] using a
+    /// given threshold.
+    pub fn wrap_with_threshold(inner: P, threshold: u32) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(inner)),
+            local_count: 0,
+            threshold,
+        }
+    }
+
+    /// Force an update of the underlying logger with the current local count.
+    pub fn flush(&mut self) {
+        self.inner
+            .lock()
+            .unwrap()
+            .update_with_count(self.local_count as _);
+        self.local_count = 0;
+    }
+}
+
+impl<P: ProgressLog> ProgressLog for ConcurrentProgressLogger<P> {
+    fn log(&mut self, now: Instant) {
+        self.inner.lock().unwrap().log(now);
+        self.local_count = 0;
+    }
+
+    fn log_if(&mut self) {
+        self.inner.lock().unwrap().log_if();
+        self.local_count = 0;
+    }
+
+    fn display_memory(&mut self, display_memory: bool) -> &mut Self {
+        self.inner.lock().unwrap().display_memory(display_memory);
+        self
+    }
+
+    fn item_name(&mut self, item_name: impl AsRef<str>) -> &mut Self {
+        self.inner.lock().unwrap().item_name(item_name);
+        self
+    }
+
+    fn log_interval(&mut self, log_interval: Duration) -> &mut Self {
+        self.inner.lock().unwrap().log_interval(log_interval);
+        self
+    }
+
+    fn expected_updates(&mut self, expected_updates: Option<usize>) -> &mut Self {
+        self.inner
+            .lock()
+            .unwrap()
+            .expected_updates(expected_updates);
+        self
+    }
+
+    fn time_unit(&mut self, time_unit: Option<TimeUnit>) -> &mut Self {
+        self.inner.lock().unwrap().time_unit(time_unit);
+        self
+    }
+
+    fn local_speed(&mut self, local_speed: bool) -> &mut Self {
+        self.inner.lock().unwrap().local_speed(local_speed);
+        self
+    }
+
+    fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self {
+        self.inner.lock().unwrap().log_target(target);
+        self
+    }
+
+    fn start(&mut self, msg: impl AsRef<str>) {
+        self.inner.lock().unwrap().start(msg);
+        self.local_count = 0;
+    }
+
+    #[inline]
+    fn update(&mut self) {
+        self.update_with_count(1)
+    }
+
+    #[inline]
+    fn update_with_count(&mut self, count: usize) {
+        match (self.local_count as usize).checked_add(count) {
+            None => {
+                // Sum overflows, update in two steps
+                let mut pl = self.inner.lock().unwrap();
+                pl.update_with_count(self.local_count as _);
+                pl.update_with_count(count);
+                self.local_count = 0;
+            }
+            Some(total_count) => {
+                if total_count >= self.threshold as usize {
+                    // Threshold reached, time to flush to the inner ProgressLogConfig
+                    self.inner.lock().unwrap().update_with_count(total_count);
+                    self.local_count = 0;
+                } else {
+                    // total_count is lower than self.threshold, which is a u16;
+                    // so total_count fits in u16.
+                    self.local_count = total_count as u32;
+                }
+            }
+        }
+    }
+
+    #[inline]
+    fn light_update(&mut self) {
+        self.local_count += 1;
+        if (self.local_count & Self::LIGHT_UPDATE_MASK) == 0 {
+            self.inner
+                .lock()
+                .unwrap()
+                .update_with_count(self.local_count as _);
+            self.local_count = 0;
+        }
+    }
+
+    fn update_and_display(&mut self) {
+        self.local_count += 1;
+        self.inner
+            .lock()
+            .unwrap()
+            .update_with_count(self.local_count as _);
+        self.local_count = 0;
+    }
+
+    fn stop(&mut self) {
+        self.inner.lock().unwrap().stop();
+        self.local_count = 0;
+    }
+
+    fn done(&mut self) {
+        self.inner.lock().unwrap().done();
+        self.local_count = 0;
+    }
+
+    fn done_with_count(&mut self, count: usize) {
+        self.inner.lock().unwrap().done_with_count(count);
+        self.local_count = 0;
+    }
+
+    fn elapsed(&self) -> Option<Duration> {
+        self.inner.lock().unwrap().elapsed()
+    }
+
+    fn refresh(&mut self) {
+        self.inner.lock().unwrap().refresh();
+    }
+
+    fn info(&self, args: Arguments<'_>) {
+        self.inner.lock().unwrap().info(args);
+    }
+
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            local_count: 0,
+            threshold: self.threshold,
+        }
+    }
+}
+
+/// Flush count buffer to the inner [`ProgressLog`].
+impl<P: ProgressLog> Drop for ConcurrentProgressLogger<P> {
+    fn drop(&mut self) {
+        self.flush();
+    }
+}
+impl Display for ConcurrentProgressLogger {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        self.inner.lock().unwrap().fmt(f)
+    }
+}
+
 #[macro_export]
 macro_rules! no_logging {
     () => {
@@ -659,5 +971,8 @@ macro_rules! no_logging {
 }
 
 pub mod prelude {
-    pub use super::{no_logging, progress_logger, ProgressLog, ProgressLogger};
+    pub use super::{
+        concurrent_progress_logger, no_logging, progress_logger, ConcurrentProgressLogger,
+        ProgressLog, ProgressLogger,
+    };
 }

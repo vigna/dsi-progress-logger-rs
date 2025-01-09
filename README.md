@@ -58,7 +58,10 @@ A typical call sequence to a progress logger is as follows:
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 use dsi_progress_logger::prelude::*;
 
-stderrlog::new().verbosity(2).init()?;
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .try_init()?;
+
 
 let mut pl = ProgressLogger::default();
 pl.item_name("pumpkin");
@@ -80,7 +83,10 @@ You may also call any setter with a key-value syntax:
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 use dsi_progress_logger::prelude::*;
 
-stderrlog::new().verbosity(2).init()?;
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .try_init()?;
+
 
 let mut pl = progress_logger!(item_name="pumpkin");
 pl.start("Smashing pumpkins...");
@@ -99,7 +105,10 @@ A progress logger can also be used as a handy timer:
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 use dsi_progress_logger::prelude::*;
 
-stderrlog::new().verbosity(2).init()?;
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .try_init()?;
+
 
 let mut pl = progress_logger!(item_name="pumpkin");
 pl.start("Smashing pumpkins...");
@@ -117,7 +126,10 @@ This progress logger will display information about  memory usage:
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 use dsi_progress_logger::prelude::*;
 
-stderrlog::new().verbosity(2).init()?;
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .try_init()?;
+
 
 let mut pl = progress_logger!(display_memory=true);
 #     Ok(())

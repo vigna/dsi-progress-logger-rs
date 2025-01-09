@@ -8,14 +8,11 @@
 use dsi_progress_logger::*;
 use log::info;
 use std::thread;
-use stderrlog;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    stderrlog::new()
-        .verbosity(2)
-        .show_module_names(true)
-        .timestamp(stderrlog::Timestamp::Second)
-        .init()?;
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .try_init()?;
 
     // Chained-setter initialization
     let mut pl = ProgressLogger::default();
