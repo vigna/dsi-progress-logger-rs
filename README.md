@@ -58,10 +58,7 @@ A typical call sequence to a progress logger is as follows:
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 use dsi_progress_logger::prelude::*;
 
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
-        .try_init()?;
-
+env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
 
 let mut pl = ProgressLogger::default();
 pl.item_name("pumpkin");
@@ -83,12 +80,9 @@ You may also call any setter with a key-value syntax:
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 use dsi_progress_logger::prelude::*;
 
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
-        .try_init()?;
+env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
 
-
-let mut pl = progress_logger!(item_name="pumpkin");
+let mut pl = progress_logger![item_name="pumpkin"];
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
    // do something on each pumpkin
@@ -105,12 +99,9 @@ A progress logger can also be used as a handy timer:
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 use dsi_progress_logger::prelude::*;
 
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
-        .try_init()?;
+env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
 
-
-let mut pl = progress_logger!(item_name="pumpkin");
+let mut pl = progress_logger![item_name="pumpkin"];
 pl.start("Smashing pumpkins...");
 for _ in 0..100 {
    // do something on each pumpkin
@@ -126,17 +117,24 @@ This progress logger will display information about  memory usage:
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 use dsi_progress_logger::prelude::*;
 
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
-        .try_init()?;
+env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
 
-
-let mut pl = progress_logger!(display_memory=true);
+let mut pl = progress_logger![display_memory=true];
 #     Ok(())
 # }
 ```
 
-## Optional logging
+## Concurrent Logging
+
+A [`ProgressLogger`] is not thread-safe. If you need to log from multiple
+threads, you can use [`ConcurrentProgressLogger`] to wrap a [`ProgressLog`]
+implementation. [`ConcurrentProgressLogger`] implements [`ProgressLog`], but it
+features also an additional method [`spawn`] that returns a new thread-safe
+[`ConcurrentProgressLogger`] with the same underlying [`ProgressLog`]
+implementation that can be passed to other threads. Convenience constructors and
+macros make concurrent progress logging as easy as single-threaded logging.
+
+## Optional Logging
 
 This crate supports optional logging by implementing [`ProgressLog`] for
 `Option<ProgressLog>::None` as a no-op. As a result, you can pass to functions an
@@ -175,7 +173,9 @@ MUR can be held responsible for them.
 
 [`ProgressLog`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html
 [`ProgressLogger`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.ProgressLogger.html
+[`ConcurrentProgressLogger`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.ConcurrentProgressLogger.html>
 [`start`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.start
+[`spawn`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.ConcurrentProgressLogger.html#tymethod.spawn>
 [`item_name`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.item_name
 [`log_interval`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.log_interval
 [`expected_updates`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.expected_updates

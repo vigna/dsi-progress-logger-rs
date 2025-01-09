@@ -1,6 +1,7 @@
 /*
  * SPDX-FileCopyrightText: 2023 Inria
  * SPDX-FileCopyrightText: 2023 Sebastiano Vigna
+ * SPDX-FileCopyrightText: 2024 Fondation Inria
  *
  * SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
  */
@@ -17,15 +18,12 @@ use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemEx
 mod utils;
 pub use utils::*;
 
-/**
-
-Logging trait.
-
-Implemented by [`ProgressLog`] and by `Option<ProgressLog>`. This approach makes it possible to
-pass as a [`ProgressLog`] either a [`ProgressLogger`], an `Option<ProgressLogger>`, or even
-`Option::<ProgressLogger>::None`.
-
-*/
+/// Logging trait.
+///
+/// This trait is implemented by [`ProgressLogger`] and by `Option<ProgressLog>`.
+/// This approach makes it possible to pass as a [`ProgressLog`] either a
+/// [`ProgressLogger`], an `Option<ProgressLogger>`, or even
+/// `Option::<ProgressLogger>::None`.
 pub trait ProgressLog {
     /// Forces a log of `self` assuming `now` is the current time.
     ///
@@ -100,7 +98,6 @@ pub trait ProgressLog {
     /// #     Ok(())
     /// # }
     /// ```
-
     fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self;
 
     /// Starts the logger, displaying the given message.
@@ -168,7 +165,7 @@ pub trait ProgressLog {
     ///        .try_init()?;
     ///
     /// let logger_name = "my_logger";
-    /// let mut pl = progress_logger!();
+    /// let mut pl = progress_logger![];
     /// pl.info(format_args!("My logger named {}", logger_name));
     /// #     Ok(())
     /// # }
@@ -367,9 +364,8 @@ pub struct ProgressLogger {
 /// ```rust
 /// use dsi_progress_logger::prelude::*;
 ///
-/// let mut pl = progress_logger!(item_name="pumpkin", display_memory=true);
+/// let mut pl = progress_logger![item_name="pumpkin", display_memory=true];
 /// ```
-
 #[macro_export]
 macro_rules! progress_logger {
     ($($method:ident = $arg:expr),* $(,)?) => {
@@ -384,6 +380,8 @@ macro_rules! progress_logger {
     }
 }
 
+/// Create a default [`ProgressLogger`] with a log interval of 10 seconds and
+/// item name set to “item”.
 impl Default for ProgressLogger {
     fn default() -> Self {
         Self {
@@ -412,7 +410,7 @@ impl Default for ProgressLogger {
 }
 
 impl ProgressLogger {
-    /// Calls to [light_update](#method.light_update) will cause a call to
+    /// Calls to [light_update](ProgressLog::light_update) will cause a call to
     /// [`Instant::now`] only if the current count is a multiple of this mask
     /// plus one.
     pub const LIGHT_UPDATE_MASK: usize = (1 << 20) - 1;
@@ -680,25 +678,52 @@ impl Display for ProgressLogger {
     }
 }
 
-/// A concurrent implementation of [`ProgressLog`] with output generated using
-/// the [`log`](https://docs.rs/log) crate at the `info` level.
+/// A concurrent wrapper for a [`ProgressLog`] implementation.
 ///
-/// Instances can be cloned to give several threads their own logger. The
-/// methods [`update`](ProgressLog::update) and
+/// This struct wraps a [`ProgressLog`] in such as way that multiple thread can
+/// write to it. Writes are synchronized using a mutex, but they are also
+/// buffered using a given threshold, so the mutex is not accessed too often.
+///
+/// Once a [`ConcurrentProgressLogger`] is created, one can
+/// [`spawn`](ConcurrentProgressLogger::spawn) it to create any number of copies
+/// using the same underlying logger.
+///
+/// The methods [`update`](ProgressLog::update) and
 /// [`update_with_count`](ProgressLog::update_with_count) buffer the increment
 /// and add it to the underlying logger only when the buffer reaches a
 /// threshold; this prevents locking the underlying logger too often. The
 /// threshold is set at creation using the methods
 /// [`with_threshold`](Self::with_threshold) and
-/// [`wrap_with_threshold`](Self::wrap_with_threshold), or by
-/// calling the method [`threshold`](Self::threshold).
-///
+/// [`wrap_with_threshold`](Self::wrap_with_threshold), or by calling the method
+/// [`threshold`](Self::threshold).
 ///
 /// The method [`light_update`](ProgressLog::light_update), as in the case of
 /// [`ProgressLogger`], further delays updates using an even faster check.
-
+///
+/// # Examples
+///
+/// ```rust
+/// use dsi_progress_logger::prelude::*;
+/// use std::thread;
+///
+/// let mut cpl = concurrent_progress_logger![item_name = "pumpkin"];
+/// cpl.start("Smashing pumpkins (using many threads)...");
+///
+/// std::thread::scope(|s| {
+///     for i in 0..100 {
+///         let mut pl = cpl.spawn();
+///         s.spawn(move || {
+///             for _ in 0..100000 {
+///                 pl.update();
+///             }
+///         });
+///     }
+/// });
+///
+/// cpl.done();
+/// ```
 pub struct ConcurrentProgressLogger<P: ProgressLog = ProgressLogger> {
-    /// An atomically reference counted, mutex-protected logger.
+    /// An atomically reference-counted, mutex-protected logger.
     inner: Arc<Mutex<P>>,
     /// The number of items processed by the current thread.
     local_count: u32,
@@ -706,17 +731,17 @@ pub struct ConcurrentProgressLogger<P: ProgressLog = ProgressLogger> {
     threshold: u32,
 }
 
-/// Macro to create a [`ConcurrentProgressLogger`] with default log target set to
-/// [`std::module_path!`], and key-value pairs instead of setters.
+/// Macro to create a [`ConcurrentProgressLogger`] based on a
+/// [`ProgressLogger`], with default log target set to [`std::module_path!`],
+/// and key-value pairs instead of setters.
 ///
 /// # Examples
 ///
 /// ```rust
 /// use dsi_progress_logger::prelude::*;
 ///
-/// let mut pl = concurrent_progress_logger!(item_name="pumpkin", display_memory=true);
+/// let mut pl = concurrent_progress_logger![item_name="pumpkin", display_memory=true];
 /// ```
-
 #[macro_export]
 macro_rules! concurrent_progress_logger {
     ($($method:ident = $arg:expr),* $(,)?) => {
@@ -731,6 +756,9 @@ macro_rules! concurrent_progress_logger {
     }
 }
 
+/// Create a new [`ConcurrentProgressLogger`] based on a default
+/// [`ProgressLogger`], with a threshold of
+/// [`DEFAULT_THRESHOLD`](Self::DEFAULT_THRESHOLD).
 impl Default for ConcurrentProgressLogger {
     fn default() -> Self {
         Self {
@@ -742,14 +770,15 @@ impl Default for ConcurrentProgressLogger {
 }
 
 impl ConcurrentProgressLogger {
-    /// Create a new [`ConcurrentProgressLogger`] wrapping a [`ProgressLogger`],
-    /// using the [default threshold](Self::DEFAULT_THRESHOLD).
+    /// Create a new [`ConcurrentProgressLogger`] based on a default
+    /// [`ProgressLogger`], using the [default
+    /// threshold](Self::DEFAULT_THRESHOLD).
     pub fn new() -> Self {
         Self::with_threshold(Self::DEFAULT_THRESHOLD)
     }
 
-    /// Create a new [`ConcurrentProgressLogger`] wrapping a [`ProgressLogger`],
-    /// using the given threshold.
+    /// Create a new [`ConcurrentProgressLogger`] wrapping a default
+    /// [`ProgressLogger`], using the given threshold.
     pub fn with_threshold(threshold: u32) -> Self {
         Self {
             inner: Arc::new(Mutex::new(ProgressLogger::default())),
@@ -810,8 +839,11 @@ impl<P: ProgressLog> ConcurrentProgressLogger<P> {
         self.local_count = 0;
     }
 
-    /// Creates a new [`ConcurrentProgressLogger`] with the same underlying
+    /// Create a new [`ConcurrentProgressLogger`] with the same underlying
     /// logger.
+    ///
+    /// The resulting logger can be passed to other threads to perform
+    /// concurrent progress logging.
     pub fn spawn(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -961,18 +993,21 @@ impl<P: ProgressLog> ProgressLog for ConcurrentProgressLogger<P> {
     }
 }
 
-/// Flush count buffer to the inner [`ProgressLog`].
+/// This implementation just calls [`flush`](ConcurrentProgressLogger::flush),
+/// to guarantee that all updates are correctly passed to the underlying logger.
 impl<P: ProgressLog> Drop for ConcurrentProgressLogger<P> {
     fn drop(&mut self) {
         self.flush();
     }
 }
+
 impl Display for ConcurrentProgressLogger {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         self.inner.lock().unwrap().fmt(f)
     }
 }
 
+/// Convenience macro specifying that no logging should be performed.
 #[macro_export]
 macro_rules! no_logging {
     () => {

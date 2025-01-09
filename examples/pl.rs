@@ -14,9 +14,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter_level(log::LevelFilter::Info)
         .try_init()?;
 
-    // Chained-setter initialization
-    let mut pl = ProgressLogger::default();
-    pl.item_name("pumpkin");
+    // Convenience macro
+    let mut pl = progress_logger![item_name = "pumpkin"];
 
     pl.start("Smashing pumpkins (slowly)...");
     for _ in 0..30 {
