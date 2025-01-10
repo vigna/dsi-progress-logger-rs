@@ -837,7 +837,7 @@ impl Display for ProgressLogger {
 /// cpl.done();
 /// ```
 pub struct ConcurrentWrapper<P: ProgressLog = ProgressLogger> {
-    /// An atomically reference-counted, mutex-protected logger.
+    /// Underlying logger
     inner: Arc<Mutex<P>>,
     /// The number of items processed by the current thread.
     local_count: u32,
