@@ -2,10 +2,13 @@
 
 ## [0.3.0]
 
-### New - 2025-01-09
+### New - 2025-01-10
 
 * New `ConcurrentWrapper` structure that makes it possible to
   log from multiple threads.
+
+* `ProgressLog` is now implemeneted for `&mut P`, given that
+  `P: ProgressLog`.
 
 ## [0.2.5] - 2024-11-06
 

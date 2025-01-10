@@ -213,6 +213,95 @@ pub trait ProgressLog {
     fn info(&self, args: Arguments<'_>);
 }
 
+impl<P: ProgressLog> ProgressLog for &mut P {
+    fn log(&mut self, now: Instant) {
+        (**self).log(now);
+    }
+
+    fn log_if(&mut self) {
+        (**self).log_if();
+    }
+
+    fn display_memory(&mut self, display_memory: bool) -> &mut Self {
+        (**self).display_memory(display_memory);
+        self
+    }
+
+    fn item_name(&mut self, item_name: impl AsRef<str>) -> &mut Self {
+        (**self).item_name(item_name);
+        self
+    }
+
+    fn log_interval(&mut self, log_interval: Duration) -> &mut Self {
+        (**self).log_interval(log_interval);
+        self
+    }
+
+    fn expected_updates(&mut self, expected_updates: Option<usize>) -> &mut Self {
+        (**self).expected_updates(expected_updates);
+        self
+    }
+
+    fn time_unit(&mut self, time_unit: Option<TimeUnit>) -> &mut Self {
+        (**self).time_unit(time_unit);
+        self
+    }
+
+    fn local_speed(&mut self, local_speed: bool) -> &mut Self {
+        (**self).local_speed(local_speed);
+        self
+    }
+
+    fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self {
+        (**self).log_target(target);
+        self
+    }
+
+    fn start(&mut self, msg: impl AsRef<str>) {
+        (**self).start(msg);
+    }
+
+    fn update(&mut self) {
+        (**self).update();
+    }
+
+    fn update_with_count(&mut self, count: usize) {
+        (**self).update_with_count(count);
+    }
+
+    fn light_update(&mut self) {
+        (**self).light_update();
+    }
+
+    fn update_and_display(&mut self) {
+        (**self).update_and_display();
+    }
+
+    fn stop(&mut self) {
+        (**self).stop();
+    }
+
+    fn done(&mut self) {
+        (**self).done();
+    }
+
+    fn done_with_count(&mut self, count: usize) {
+        (**self).done_with_count(count);
+    }
+
+    fn elapsed(&self) -> Option<Duration> {
+        (**self).elapsed()
+    }
+
+    fn refresh(&mut self) {
+        (**self).refresh();
+    }
+
+    fn info(&self, args: Arguments<'_>) {
+        (**self).info(args);
+    }
+}
+
 impl<P: ProgressLog> ProgressLog for Option<P> {
     fn log(&mut self, now: Instant) {
         if let Some(pl) = self {
