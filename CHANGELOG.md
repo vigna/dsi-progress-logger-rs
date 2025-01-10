@@ -1,8 +1,8 @@
 # Change Log
 
-## [0.3.0]
+## [0.3.0] - 2025-01-10
 
-### New - 2025-01-10
+### New
 
 * New `ConcurrentWrapper` structure that makes it possible to
   log from multiple threads.
