@@ -1038,12 +1038,12 @@ impl<P: ProgressLog> ProgressLog for ConcurrentWrapper<P> {
             }
             Some(total_count) => {
                 if total_count >= self.threshold as usize {
-                    // Threshold reached, time to flush to the inner ProgressLogConfig
+                    // Threshold reached, time to flush to the inner ProgressLog
                     self.inner.lock().unwrap().update_with_count(total_count);
                     self.local_count = 0;
                 } else {
-                    // total_count is lower than self.threshold, which is a u16;
-                    // so total_count fits in u16.
+                    // total_count is lower than self.threshold, which is a u32;
+                    // so total_count fits in u32.
                     self.local_count = total_count as u32;
                 }
             }
