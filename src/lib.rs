@@ -211,13 +211,6 @@ pub trait ProgressLog {
     /// # }
     /// ```
     fn info(&self, args: Arguments<'_>);
-
-    /// Clone the logger, returning a logger with the same setup but with all
-    /// the counters reset.
-    ///
-    /// Note that we cannot simply implement the [`Clone`] trait because the orphan
-    /// rule would prevent us from implementing it for `Option<ProgressLog>`.
-    fn clone(&self) -> Self;
 }
 
 impl<P: ProgressLog> ProgressLog for Option<P> {
@@ -347,10 +340,6 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
             pl.info(args);
         }
     }
-
-    fn clone(&self) -> Self {
-        self.as_ref().map(|pl| pl.clone())
-    }
 }
 
 /// An implementation of [`ProgressLog`] with output generated using the
@@ -358,6 +347,9 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
 ///
 /// Instances can be created by using fluent setters, or by using the
 /// [`progress_logger`] macro.
+///
+/// You can [clone](#impl-Clone-for-ProgressLogger) a logger to create a new one
+/// with the same setup but with all the counters reset.
 ///
 /// # Examples
 ///
@@ -684,21 +676,6 @@ impl ProgressLog for ProgressLogger {
     fn info(&self, args: Arguments<'_>) {
         info!(target: &self.log_target, "{}", std::fmt::format(args));
     }
-
-    #[allow(clippy::manual_map)]
-    fn clone(&self) -> Self {
-        Self {
-            item_name: self.item_name.clone(),
-            log_interval: self.log_interval,
-            time_unit: self.time_unit,
-            local_speed: self.local_speed,
-            system: match self.system {
-                Some(_) => Some(System::new_with_specifics(RefreshKind::new().with_memory())),
-                None => None,
-            },
-            ..ProgressLogger::default()
-        }
-    }
 }
 
 impl Display for ProgressLogger {
@@ -792,6 +769,25 @@ impl Display for ProgressLogger {
     }
 }
 
+/// Clone the logger, returning a logger with the same setup but with all
+/// the counters reset.
+impl Clone for ProgressLogger {
+    #[allow(clippy::manual_map)]
+    fn clone(&self) -> Self {
+        Self {
+            item_name: self.item_name.clone(),
+            log_interval: self.log_interval,
+            time_unit: self.time_unit,
+            local_speed: self.local_speed,
+            system: match self.system {
+                Some(_) => Some(System::new_with_specifics(RefreshKind::new().with_memory())),
+                None => None,
+            },
+            ..ProgressLogger::default()
+        }
+    }
+}
+
 /// A concurrent wrapper for a [`ProgressLog`] implementation.
 ///
 /// This struct wraps a [`ProgressLog`] in such as way that multiple thread can
@@ -799,8 +795,8 @@ impl Display for ProgressLogger {
 /// buffered using a given threshold, so the mutex is not accessed too often.
 ///
 /// Once a [`ConcurrentWrapper`] is created, one can
-/// [`spawn`](ConcurrentWrapper::spawn) it to create any number of copies
-/// using the same underlying logger.
+/// [clone](#impl-Clone-for-ConcurrentWrapper<P>) it to create any number of
+/// copies using the same underlying logger.
 ///
 /// The methods [`update`](ProgressLog::update) and
 /// [`update_with_count`](ProgressLog::update_with_count) buffer the increment
@@ -814,6 +810,9 @@ impl Display for ProgressLogger {
 /// The method [`light_update`](ProgressLog::light_update), as in the case of
 /// [`ProgressLogger`], further delays updates using an even faster check.
 ///
+/// You can [create a duplicate](Self::dup) of a concurrent wrapper, which will
+/// use a cloned inner logger.
+///
 /// # Examples
 ///
 /// ```rust
@@ -825,7 +824,7 @@ impl Display for ProgressLogger {
 ///
 /// std::thread::scope(|s| {
 ///     for i in 0..100 {
-///         let mut pl = cpl.spawn();
+///         let mut pl = cpl.clone();
 ///         s.spawn(move || {
 ///             for _ in 0..100000 {
 ///                 pl.update();
@@ -952,15 +951,19 @@ impl<P: ProgressLog> ConcurrentWrapper<P> {
             .update_with_count(self.local_count as _);
         self.local_count = 0;
     }
-
-    /// Create a new [`ConcurrentWrapper`] with the same underlying
-    /// logger.
+}
+impl<P: ProgressLog + Clone> ConcurrentWrapper<P> {
+    /// Clone the concurrent wrapper, obtaning a new one with the same
+    /// threshold, with a local count of zero, and with an inner [`ProgressLog`]
+    /// that is a clone of the original one.
     ///
-    /// The resulting logger can be passed to other threads to perform
-    /// concurrent progress logging.
-    pub fn spawn(&self) -> Self {
+    /// Note that the this method has the same sematics of [`ProgressLogser`'s
+    /// `Clone` implementation](ProgressLogger#impl-Clone-for-ProgressLogger),
+    /// but it is much more ergonomic here to have [cloning to generate copies
+    /// with the same underlying logger](#impl-Clone-for-ConcurrentWrapper<P>).
+    pub fn dup(&self) -> Self {
         Self {
-            inner: self.inner.clone(),
+            inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())),
             local_count: 0,
             threshold: self.threshold,
         }
@@ -1097,10 +1100,17 @@ impl<P: ProgressLog> ProgressLog for ConcurrentWrapper<P> {
     fn info(&self, args: Arguments<'_>) {
         self.inner.lock().unwrap().info(args);
     }
+}
 
+/// Clone the concurrent wrapper, obtaning a new one with the same threshold,
+/// with a local count of zero, and the same inner [`ProgressLog`].
+///
+/// The resulting logger can be passed to other threads to perform
+/// concurrent progress logging.
+impl<P: ProgressLog + Clone> Clone for ConcurrentWrapper<P> {
     fn clone(&self) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())),
+            inner: self.inner.clone(),
             local_count: 0,
             threshold: self.threshold,
         }
