@@ -904,6 +904,8 @@ impl Clone for ProgressLogger {
 ///
 /// # Examples
 ///
+/// In this example, we manually spawn processes:
+///
 /// ```rust
 /// use dsi_progress_logger::prelude::*;
 /// use std::thread;
@@ -916,6 +918,7 @@ impl Clone for ProgressLogger {
 ///         let mut pl = cpl.clone();
 ///         s.spawn(move || {
 ///             for _ in 0..100000 {
+///                 // do something on each pumpkin
 ///                 pl.update();
 ///             }
 ///         });
@@ -924,6 +927,39 @@ impl Clone for ProgressLogger {
 ///
 /// cpl.done();
 /// ```
+///
+/// You can obtain the same behavior with [`rayon`](https://docs.rs/rayon) using
+/// methods such as
+/// [`for_each_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.for_each_with)
+/// and
+/// [`map_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.map_with):
+///
+/// ```rust
+/// use dsi_progress_logger::prelude::*;
+/// use std::thread;
+/// use rayon::prelude::*;
+///
+/// let mut cpl = concurrent_progress_logger![item_name = "pumpkin"];
+/// cpl.start("Smashing pumpkins (using many threads)...");
+///
+/// (0..1000000).into_par_iter().
+///     with_min_len(1000). // optional, reduces the amount of cloning
+///     for_each_with(cpl.clone(), |pl, i| {
+///         // do something on each pumpkin
+///         pl.update();
+///     }
+/// );
+///
+/// cpl.done();
+/// ```
+///
+/// Note that you have to pass `cpl.clone()` to avoid a move that would make the
+/// call to [`done`](ProgressLog::done) impossible. Also, since
+/// [`for_each_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.for_each_with)
+/// might perform excessive cloning if jobs are too short, you can use
+/// [`with_min_len`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.with_min_len)
+/// to reduce the amount of cloning.
+
 pub struct ConcurrentWrapper<P: ProgressLog = ProgressLogger> {
     /// Underlying logger
     inner: Arc<Mutex<P>>,
