@@ -14,7 +14,7 @@ use pluralizer::pluralize;
 use std::fmt::{Arguments, Display, Formatter, Result};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use sysinfo::{Pid, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
+use sysinfo::{MemoryRefreshKind, Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 mod utils;
 pub use utils::*;
 
@@ -200,9 +200,9 @@ pub trait ProgressLog {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// use dsi_progress_logger::*;
     ///
-    ///    env_logger::builder()
-    ///        .filter_level(log::LevelFilter::Info)
-    ///        .try_init()?;
+    /// env_logger::builder()
+    ///     .filter_level(log::LevelFilter::Info)
+    ///     .try_init()?;
     ///
     /// let logger_name = "my_logger";
     /// let mut pl = progress_logger![];
@@ -211,6 +211,39 @@ pub trait ProgressLog {
     /// # }
     /// ```
     fn info(&self, args: Arguments<'_>);
+}
+
+/// Concurrent logging trait.
+///
+/// This trait extends [`ProgressLog`]. By contract, [`Clone`] implementations
+/// must return a new logger updating the same internal state. If you need to
+/// duplicate a concurrent logger, you can use the
+/// [`dup`](ConcurrentProgressLog::dup) method.
+///
+/// Note that [`ProgressLogser`'s `Clone`
+/// implementation](ProgressLogger#impl-Clone-for-ProgressLogger) has a
+/// completely different semantics, but it is much more ergonomic here to have
+/// [cloning to generate copies with the same underlying
+/// logger](#impl-Clone-for-ConcurrentWrapper<P>), because then one can use a
+/// concurrent logger with methods like
+/// [`rayon::ParallelIterator::for_each_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.for_each_with),
+/// [`rayon::ParallelIterator::map_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.map_with),
+/// etc.
+///
+/// # Examples
+///
+/// See the [`ConcurrentWrapper`] documentation.
+pub trait ConcurrentProgressLog: ProgressLog + Sync + Send + Clone {
+    /// The type returned by [`dup`](ConcurrentProgressLog::dup).
+    type Duplicated: ConcurrentProgressLog;
+
+    /// Duplicate the concurrent progress logger, obtaning a new one.
+    ///
+    /// Note that the this method has the same sematics of [`ProgressLogger`'s
+    /// `Clone` implementation](ProgressLogger#impl-Clone-for-ProgressLogger),
+    /// but in a [`ConcurrentProgressLog`] by contract [cloning must generate
+    /// copies with the same underlying logger](ConcurrentProgressLog).
+    fn dup(&self) -> Self::Duplicated;
 }
 
 impl<P: ProgressLog> ProgressLog for &mut P {
@@ -431,6 +464,13 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
     }
 }
 
+impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
+    type Duplicated = Option<P::Duplicated>;
+    fn dup(&self) -> Self::Duplicated {
+        self.as_ref().map(|pl| pl.dup())
+    }
+}
+
 /// An implementation of [`ProgressLog`] with output generated using the
 /// [`log`](https://docs.rs/log) crate at the `info` level.
 ///
@@ -438,7 +478,9 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
 /// [`progress_logger`] macro.
 ///
 /// You can [clone](#impl-Clone-for-ProgressLogger) a logger to create a new one
-/// with the same setup but with all the counters reset.
+/// with the same setup but with all the counters reset. This behavior is useful
+/// when you want to configure a logger and then use its configuration for other
+/// loggers.
 ///
 /// # Examples
 ///
@@ -654,7 +696,9 @@ impl ProgressLog for ProgressLogger {
     fn display_memory(&mut self, display_memory: bool) -> &mut Self {
         match (display_memory, &self.system) {
             (true, None) => {
-                self.system = Some(System::new_with_specifics(RefreshKind::new().with_memory()));
+                self.system = Some(System::new_with_specifics(
+                    RefreshKind::nothing().with_memory(MemoryRefreshKind::nothing().with_ram()),
+                ));
             }
             (false, Some(_)) => {
                 self.system = None;
@@ -709,7 +753,11 @@ impl ProgressLog for ProgressLogger {
 
     fn refresh(&mut self) {
         if let Some(system) = &mut self.system {
-            system.refresh_process_specifics(self.pid, ProcessRefreshKind::new());
+            system.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&[self.pid]),
+                false,
+                ProcessRefreshKind::nothing().with_memory(),
+            );
         }
     }
 
@@ -869,7 +917,9 @@ impl Clone for ProgressLogger {
             time_unit: self.time_unit,
             local_speed: self.local_speed,
             system: match self.system {
-                Some(_) => Some(System::new_with_specifics(RefreshKind::new().with_memory())),
+                Some(_) => Some(System::new_with_specifics(
+                    RefreshKind::nothing().with_memory(MemoryRefreshKind::nothing().with_ram()),
+                )),
                 None => None,
             },
             ..ProgressLogger::default()
@@ -959,7 +1009,6 @@ impl Clone for ProgressLogger {
 /// might perform excessive cloning if jobs are too short, you can use
 /// [`with_min_len`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.with_min_len)
 /// to reduce the amount of cloning.
-
 pub struct ConcurrentWrapper<P: ProgressLog = ProgressLogger> {
     /// Underlying logger
     inner: Arc<Mutex<P>>,
@@ -1077,16 +1126,35 @@ impl<P: ProgressLog> ConcurrentWrapper<P> {
         self.local_count = 0;
     }
 }
+
 impl<P: ProgressLog + Clone> ConcurrentWrapper<P> {
+    /// Duplicates the concurrent wrapper, obtaning a new one with the same
+    /// threshold, with a local count of zero, and with an inner
+    /// [`ProgressLog`] that is a clone of the original one.
+    pub fn dup(&self) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())),
+            local_count: 0,
+            threshold: self.threshold,
+        }
+    }
+}
+impl<P: ProgressLog + Clone> Clone for ConcurrentWrapper<P> {
     /// Clone the concurrent wrapper, obtaning a new one with the same
     /// threshold, with a local count of zero, and with an inner [`ProgressLog`]
     /// that is a clone of the original one.
-    ///
-    /// Note that the this method has the same sematics of [`ProgressLogser`'s
-    /// `Clone` implementation](ProgressLogger#impl-Clone-for-ProgressLogger),
-    /// but it is much more ergonomic here to have [cloning to generate copies
-    /// with the same underlying logger](#impl-Clone-for-ConcurrentWrapper<P>).
-    pub fn dup(&self) -> Self {
+    fn clone(&self) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())),
+            local_count: 0,
+            threshold: self.threshold,
+        }
+    }
+}
+
+impl<P: ProgressLog + Clone + Send> ConcurrentProgressLog for ConcurrentWrapper<P> {
+    type Duplicated = ConcurrentWrapper<P>;
+    fn dup(&self) -> Self {
         Self {
             inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())),
             local_count: 0,
@@ -1159,16 +1227,19 @@ impl<P: ProgressLog> ProgressLog for ConcurrentWrapper<P> {
         match (self.local_count as usize).checked_add(count) {
             None => {
                 // Sum overflows, update in two steps
-                let mut pl = self.inner.lock().unwrap();
-                pl.update_with_count(self.local_count as _);
-                pl.update_with_count(count);
+                let local_count = self.local_count;
+                // By setting here self.local_count we guarantee
+                // to keep the lock for the minimum time possible.
                 self.local_count = 0;
+                let mut pl = self.inner.lock().unwrap();
+                pl.update_with_count(local_count as _);
+                pl.update_with_count(count);
             }
             Some(total_count) => {
                 if total_count >= self.threshold as usize {
+                    self.local_count = 0;
                     // Threshold reached, time to flush to the inner ProgressLog
                     self.inner.lock().unwrap().update_with_count(total_count);
-                    self.local_count = 0;
                 } else {
                     // total_count is lower than self.threshold, which is a u32;
                     // so total_count fits in u32.
@@ -1227,21 +1298,6 @@ impl<P: ProgressLog> ProgressLog for ConcurrentWrapper<P> {
     }
 }
 
-/// Clone the concurrent wrapper, obtaning a new one with the same threshold,
-/// with a local count of zero, and the same inner [`ProgressLog`].
-///
-/// The resulting logger can be passed to other threads to perform
-/// concurrent progress logging.
-impl<P: ProgressLog + Clone> Clone for ConcurrentWrapper<P> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            local_count: 0,
-            threshold: self.threshold,
-        }
-    }
-}
-
 /// This implementation just calls [`flush`](ConcurrentWrapper::flush),
 /// to guarantee that all updates are correctly passed to the underlying logger.
 impl<P: ProgressLog> Drop for ConcurrentWrapper<P> {
@@ -1260,13 +1316,13 @@ impl Display for ConcurrentWrapper {
 #[macro_export]
 macro_rules! no_logging {
     () => {
-        &mut Option::<dsi_progress_logger::ProgressLogger>::None
+        &mut Option::<dsi_progress_logger::ConcurrentWrapper::<dsi_progress_logger::ProgressLogger>>::None
     };
 }
 
 pub mod prelude {
     pub use super::{
-        concurrent_progress_logger, no_logging, progress_logger, ConcurrentWrapper, ProgressLog,
-        ProgressLogger,
+        concurrent_progress_logger, no_logging, progress_logger, ConcurrentProgressLog,
+        ConcurrentWrapper, ProgressLog, ProgressLogger,
     };
 }

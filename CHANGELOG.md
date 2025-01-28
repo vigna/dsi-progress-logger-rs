@@ -1,5 +1,15 @@
 # Change Log
 
+## [0.4.0] - 2025-01-28
+
+### New
+
+* New `ConcurrentProgressLog` trait analogous to `ProgressLog`.
+
+### Improved
+
+* The `no_logging!` macro now works with `ConcurrentProgressLog`.
+
 ## [0.3.0] - 2025-01-10
 
 ### New
