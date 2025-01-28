@@ -6,9 +6,13 @@
 
 * New `ConcurrentProgressLog` trait analogous to `ProgressLog`.
 
+* New `ProgressLog::add_to_count` method.
+
 ### Improved
 
 * The `no_logging!` macro now works with `ConcurrentProgressLog`.
+
+* Updated to latest `sysinfo` crate.
 
 ## [0.3.0] - 2025-01-10
 

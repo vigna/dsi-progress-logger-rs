@@ -20,14 +20,14 @@ There is a [`ProgressLog`] trait and a default implementation
 
 ## Concurrent Logging
 
-A [`ProgressLog`] is not thread-safe. If you need to log progress from multiple
-threads, you can use a [`ConcurrentProgressLog`], which is obtained by wrapping
-a [`ProgressLog`] implementation using a [`ConcurrentWrapper`].
+If you need to log progress from multiple threads, you can use a
+[`ConcurrentProgressLog`], which is obtained, for example,  by wrapping a
+[`ProgressLog`] implementation using a [`ConcurrentWrapper`].
 
 [`ConcurrentProgressLog`] extends [`ProgressLog`], but when you clone a
-[`ConcurrentProgressLog`] you obtain new thread-safe [`ConcurrentProgressLog`] with
-the same underlying [`ProgressLog`] implementation that can be passed to other
-threads. As a result, a [`ConcurrentProgressLog`] can be used with methods like
+[`ConcurrentProgressLog`] you obtain a new [`ConcurrentProgressLog`], based on
+the same underlying [`ProgressLog`], that can be passed to other threads. As a
+result, a [`ConcurrentProgressLog`] can be used with methods like
 [`rayon::ParallelIterator::for_each_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.for_each_with),
 [`rayon::ParallelIterator::map_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.map_with),
 and so on. Convenience constructors and macros make concurrent progress logging
@@ -41,11 +41,10 @@ an argument `pl` that is a `&mut impl ProgressLog`, with the following behavior:
 
 - if you pass a `&mut ProgressLogger`, the progress logger will be used, without
   any check;
-- if you pass a `&mut Option::<ProgressLogger>::None`, no
-  logging will be performed, and in fact the logging code should be entirely
-  optimized away by the compiler; the macro [`no_logging!`], which expands
-  to `&mut Option::<ProgressLogger>::None`, can be used a convenient way to
-  switch off logging;
+- if you pass a `&mut Option::<ProgressLogger>::None`, no logging will be
+  performed, and in fact the logging code should be entirely optimized away by
+  the compiler; the macro [`no_logging!`] can be used a convenient way to switch
+  off logging;
 - if you pass an `&mut Option<ProgressLogger>`, logging will happen depending on
   the variant, and there will be a runtime check for each call.
 
