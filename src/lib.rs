@@ -66,6 +66,9 @@ pub use utils::*;
 ///
 /// See the [`ProgressLogger`] documentation.
 pub trait ProgressLog {
+    /// The type returned by [`concurrent`](ProgressLog::concurrent).
+    type Concurrent: ConcurrentProgressLog;
+
     /// Force a log of `self` assuming `now` is the current time.
     ///
     /// This is a low-level method that should not be called directly.
@@ -221,6 +224,18 @@ pub trait ProgressLog {
     /// # }
     /// ```
     fn info(&self, args: Arguments<'_>);
+
+    /// Return a concurrent copy of the logger.
+    ///
+    /// Some methods require both sequential and concurrent logging. To keep
+    /// optional logging efficient, we suggest in this cases to use `&mut impl
+    /// ProgressLog` to pass a logger as an argument, and then creating a
+    /// concurrent copy of the logger with this method. If the original logger
+    /// is `None`, the concurrent copy will be `None` as well.
+    ///
+    /// Concurrent logger implementations can just return
+    /// [`dup`](ConcurrentProgressLog::dup).
+    fn concurrent(&self) -> Self::Concurrent;
 }
 
 /// Concurrent logging trait.
@@ -241,12 +256,14 @@ pub trait ProgressLog {
 /// completely different semantics.
 ///
 /// As explained in the [crate documentation](crate), we suggest using `&mut
-/// impl ConcurrentProgressLog` to pass a concurrent logger as an argument, to
+/// Self::Concurrent` to pass a concurrent logger as an argument, to
 /// be able to use optional logging.
 ///
 /// # Examples
 ///
 /// See the [`ConcurrentWrapper`] documentation.
+///     type Concurrent = Option<P::Concurrent>;
+///
 pub trait ConcurrentProgressLog: ProgressLog + Sync + Send + Clone {
     /// The type returned by [`dup`](ConcurrentProgressLog::dup).
     type Duplicated: ConcurrentProgressLog;
@@ -261,6 +278,8 @@ pub trait ConcurrentProgressLog: ProgressLog + Sync + Send + Clone {
 }
 
 impl<P: ProgressLog> ProgressLog for &mut P {
+    type Concurrent = P::Concurrent;
+
     fn log(&mut self, now: Instant) {
         (**self).log(now);
     }
@@ -351,9 +370,15 @@ impl<P: ProgressLog> ProgressLog for &mut P {
     fn info(&self, args: Arguments<'_>) {
         (**self).info(args);
     }
+
+    fn concurrent(&self) -> Self::Concurrent {
+        (**self).concurrent()
+    }
 }
 
 impl<P: ProgressLog> ProgressLog for Option<P> {
+    type Concurrent = Option<P::Concurrent>;
+
     fn log(&mut self, now: Instant) {
         if let Some(pl) = self {
             pl.log(now);
@@ -485,6 +510,10 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         if let Some(pl) = self {
             pl.info(args);
         }
+    }
+
+    fn concurrent(&self) -> Self::Concurrent {
+        self.as_ref().map(|pl| pl.concurrent())
     }
 }
 
@@ -724,6 +753,8 @@ impl ProgressLogger {
 }
 
 impl ProgressLog for ProgressLogger {
+    type Concurrent = ConcurrentWrapper<Self>;
+
     fn log(&mut self, now: Instant) {
         self.refresh();
         info!(target: &self.log_target, "{}", self);
@@ -862,6 +893,10 @@ impl ProgressLog for ProgressLogger {
 
     fn info(&self, args: Arguments<'_>) {
         info!(target: &self.log_target, "{}", std::fmt::format(args));
+    }
+
+    fn concurrent(&self) -> Self::Concurrent {
+        ConcurrentWrapper::wrap(self.clone())
     }
 }
 
@@ -1056,7 +1091,7 @@ impl<P: ProgressLog + Clone> Clone for ConcurrentWrapper<P> {
     /// [`ProgressLog`].
     fn clone(&self) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())),
+            inner: self.inner.clone(),
             local_count: 0,
             threshold: self.threshold,
         }
@@ -1154,7 +1189,7 @@ impl<P: ProgressLog> ConcurrentWrapper<P> {
         self.inner
             .lock()
             .unwrap()
-            .update_with_count(self.local_count as _);
+            .add_to_count(self.local_count as _);
         self.local_count = 0;
     }
 }
@@ -1183,7 +1218,9 @@ impl<P: ProgressLog + Clone + Send> ConcurrentProgressLog for ConcurrentWrapper<
     }
 }
 
-impl<P: ProgressLog> ProgressLog for ConcurrentWrapper<P> {
+impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
+    type Concurrent = Self;
+
     fn log(&mut self, now: Instant) {
         self.inner.lock().unwrap().log(now);
         self.local_count = 0;
@@ -1315,9 +1352,15 @@ impl<P: ProgressLog> ProgressLog for ConcurrentWrapper<P> {
     fn info(&self, args: Arguments<'_>) {
         self.inner.lock().unwrap().info(args);
     }
+
+    fn concurrent(&self) -> Self::Concurrent {
+        self.dup()
+    }
 }
 
 /// This implementation just calls [`flush`](ConcurrentWrapper::flush),
+///     type Concurrent = Option<P::Concurrent>;
+///
 /// to guarantee that all updates are correctly passed to the underlying logger.
 impl<P: ProgressLog> Drop for ConcurrentWrapper<P> {
     fn drop(&mut self) {
