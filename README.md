@@ -48,7 +48,12 @@ an argument `pl` that is a `&mut impl ProgressLog`, with the following behavior:
 - if you pass an `&mut Option<ProgressLogger>`, logging will happen depending on
   the variant, and there will be a runtime check for each call.
 
-All of the above applies to [`ConcurrentProgressLog`], too.
+All of the above applies to [`ConcurrentProgressLog`], too. Moreover, the
+[`ProgressLog::concurrent`] method can be used to obtain a
+[`ConcurrentProgressLog`] from a [`ProgressLog`]. Thus, in case you need both
+sequential and concurrent logging you can pass a `&mut impl ProgressLog` and
+then obtain a concurrent logger from it. If the original logger is `None`, the
+concurrent logger will be `None`, too, and so on.
 
 There is an [`info`] method that can be used to log information to the logger at
 the `info` level. The advantage of using [`info`] is that the logging will be
@@ -67,6 +72,7 @@ MUR can be held responsible for them.
 [`ConcurrentProgressLog`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ConcurrentProgressLog.html>
 [`ConcurrentWrapper`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.ConcurrentWrapper.html>
 [`info`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.info
+[`ProgressLog::concurrent`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.concurrent>
 [`it.unimi.dsi.util.ProgressLogger`]: https://dsiutils.di.unimi.it/docs/it/unimi/dsi/logging/ProgressLogger.html
 [DSI Utilities]: https://dsiutils.di.unimi.it/
 [`log`]: https://docs.rs/log

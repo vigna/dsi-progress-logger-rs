@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.5.0] - 2025-01-30
+
+### New
+
+* New `ProgressLog::concurrent` method to derive a `ConcurrentProgressLog` from
+  a `ProgressLog`.
+
 ## [0.4.0] - 2025-01-28
 
 ### New
