@@ -1312,8 +1312,11 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
     #[inline]
     fn light_update(&mut self) {
         self.local_count += 1;
-        if (self.local_count & Self::LIGHT_UPDATE_MASK) == 0 {
-            self.update_with_count(self.local_count as _);
+        if (self.local_count & Self::LIGHT_UPDATE_MASK) == 0 && self.local_count >= self.threshold {
+            // Threshold reached, time to flush to the inner ProgressLog
+            let local_count = self.local_count as usize;
+            self.local_count = 0;
+            self.inner.lock().unwrap().update_with_count(local_count);
         }
     }
 

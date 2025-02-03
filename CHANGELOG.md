@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.5.1] - 2025-02-03
+
+### Fixed
+
+* `ConcurrentWrapper::update_light` was adding the local count twice.
+
 ## [0.5.0] - 2025-01-30
 
 ### New
