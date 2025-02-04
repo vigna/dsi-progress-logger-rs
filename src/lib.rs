@@ -1048,7 +1048,6 @@ impl Display for ProgressLogger {
 ///
 /// ```rust
 /// use dsi_progress_logger::prelude::*;
-/// use std::thread;
 /// use rayon::prelude::*;
 ///
 /// let mut cpl = concurrent_progress_logger![item_name = "pumpkin"];
