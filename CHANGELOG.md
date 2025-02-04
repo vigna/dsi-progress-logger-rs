@@ -1,5 +1,13 @@
 # Change Log
 
+## [0.6.0] - 2025-02-04
+
+### New
+
+* New `ConcurrentLog::update_with_count_and_time` internal method that makes it
+  possible to move the call to `Instant::now` out of the critical section
+  in `ConcurrentWrapper`.
+
 ## [0.5.1] - 2025-02-03
 
 ### Fixed

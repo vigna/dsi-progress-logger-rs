@@ -77,7 +77,7 @@ pub trait ProgressLog {
     /// Log `self` if it is time to log.
     ///
     /// This is a low-level method that should not be called directly.
-    fn log_if(&mut self);
+    fn log_if(&mut self, now: Instant);
 
     /// Set the display of memory information.
     ///
@@ -162,7 +162,16 @@ pub trait ProgressLog {
     fn update(&mut self);
 
     /// Set the count and check whether it is time to log.
-    fn update_with_count(&mut self, count: usize);
+    fn update_with_count(&mut self, count: usize) {
+        self.update_with_count_and_time(count, Instant::now());
+    }
+
+    /// Set the count and check whether it is time to log, given the current
+    /// time.
+    ///
+    /// This method is mainly useful for wrappers that want to avoid unnecessary
+    /// calls to [`Instant::now`].
+    fn update_with_count_and_time(&mut self, count: usize, now: Instant);
 
     /// Increase the count but checks whether it is time to log only after an
     /// implementation-defined number of calls.
@@ -284,8 +293,8 @@ impl<P: ProgressLog> ProgressLog for &mut P {
         (**self).log(now);
     }
 
-    fn log_if(&mut self) {
-        (**self).log_if();
+    fn log_if(&mut self, now: Instant) {
+        (**self).log_if(now);
     }
 
     fn add_to_count(&mut self, count: usize) {
@@ -335,8 +344,8 @@ impl<P: ProgressLog> ProgressLog for &mut P {
         (**self).update();
     }
 
-    fn update_with_count(&mut self, count: usize) {
-        (**self).update_with_count(count);
+    fn update_with_count_and_time(&mut self, count: usize, now: Instant) {
+        (**self).update_with_count_and_time(count, now);
     }
 
     fn light_update(&mut self) {
@@ -385,9 +394,9 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         }
     }
 
-    fn log_if(&mut self) {
+    fn log_if(&mut self, now: Instant) {
         if let Some(pl) = self {
-            pl.log_if();
+            pl.log_if(now);
         }
     }
 
@@ -460,9 +469,9 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         }
     }
 
-    fn update_with_count(&mut self, count: usize) {
+    fn update_with_count_and_time(&mut self, count: usize, now: Instant) {
         if let Some(pl) = self {
-            pl.update_with_count(count);
+            pl.update_with_count_and_time(count, now);
         }
     }
 
@@ -763,8 +772,7 @@ impl ProgressLog for ProgressLogger {
         self.next_log_time = now + self.log_interval;
     }
 
-    fn log_if(&mut self) {
-        let now = Instant::now();
+    fn log_if(&mut self, now: Instant) {
         if self.next_log_time <= now {
             self.log(now);
         }
@@ -844,12 +852,12 @@ impl ProgressLog for ProgressLogger {
 
     fn update(&mut self) {
         self.count += 1;
-        self.log_if();
+        self.log_if(Instant::now());
     }
 
-    fn update_with_count(&mut self, count: usize) {
+    fn update_with_count_and_time(&mut self, count: usize, now: Instant) {
         self.count += count;
-        self.log_if();
+        self.log_if(now);
     }
 
     /// Increases the count and, once every
@@ -859,7 +867,7 @@ impl ProgressLog for ProgressLogger {
     fn light_update(&mut self) {
         self.count += 1;
         if (self.count & Self::LIGHT_UPDATE_MASK) == 0 {
-            self.log_if();
+            self.log_if(Instant::now());
         }
     }
 
@@ -1226,8 +1234,8 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
         self.local_count = 0;
     }
 
-    fn log_if(&mut self) {
-        self.inner.lock().unwrap().log_if();
+    fn log_if(&mut self, now: Instant) {
+        self.inner.lock().unwrap().log_if(now);
         self.local_count = 0;
     }
 
@@ -1284,14 +1292,20 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
     }
 
     #[inline]
+    fn update_with_count_and_time(&mut self, count: usize, _now: Instant) {
+        self.update_with_count(count);
+    }
+
+    #[inline]
     fn update_with_count(&mut self, count: usize) {
         match (self.local_count as usize).checked_add(count) {
             None => {
                 // Sum overflows, update in two steps
                 {
+                    let now = Instant::now();
                     let mut inner = self.inner.lock().unwrap();
-                    inner.update_with_count(self.local_count as _);
-                    inner.update_with_count(count);
+                    inner.update_with_count_and_time(self.local_count as _, now);
+                    inner.update_with_count_and_time(count, now);
                 }
                 self.local_count = 0;
             }
@@ -1299,7 +1313,11 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
                 if total_count >= self.threshold as usize {
                     self.local_count = 0;
                     // Threshold reached, time to flush to the inner ProgressLog
-                    self.inner.lock().unwrap().update_with_count(total_count);
+                    let now = Instant::now();
+                    self.inner
+                        .lock()
+                        .unwrap()
+                        .update_with_count_and_time(total_count, now);
                 } else {
                     // total_count is lower than self.threshold, which is a u32;
                     // so total_count fits in u32.
@@ -1316,7 +1334,11 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
             // Threshold reached, time to flush to the inner ProgressLog
             let local_count = self.local_count as usize;
             self.local_count = 0;
-            self.inner.lock().unwrap().update_with_count(local_count);
+            let now = Instant::now();
+            self.inner
+                .lock()
+                .unwrap()
+                .update_with_count_and_time(local_count, now);
         }
     }
 

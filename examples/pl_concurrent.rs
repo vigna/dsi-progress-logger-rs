@@ -8,7 +8,7 @@
 
 use dsi_progress_logger::*;
 
-const ITER_PER_THREAD: u64 = 100000000;
+const ITER_PER_THREAD: u64 = 1000000000;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder()
@@ -16,8 +16,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .try_init()?;
 
     // Convenience macro
-    let mut cpl = concurrent_progress_logger![item_name = "pumpkin"];
-    cpl.start("Smashing pumpkins (using many threads)...");
+    let mut cpl = concurrent_progress_logger![
+        item_name = "pumpkin",
+        expected_updates = (100 * ITER_PER_THREAD).try_into().ok()
+    ];
+
+    cpl.start(format!(
+        "Smashing {} pumpkins (using many threads)...",
+        100 * ITER_PER_THREAD
+    ));
 
     std::thread::scope(|s| {
         for i in 0..100 {
@@ -25,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             s.spawn(move || {
                 let i = i as u64;
                 for _ in (i * ITER_PER_THREAD)..(i + 1) * ITER_PER_THREAD {
-                    pl.light_update();
+                    pl.update();
                 }
             });
         }
