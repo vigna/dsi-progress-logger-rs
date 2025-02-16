@@ -8,7 +8,7 @@
 
 #![doc = include_str!("../README.md")]
 
-use log::info;
+use log::{debug, error, info, trace, warn};
 use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
 use std::fmt::{Arguments, Display, Formatter, Result};
@@ -210,11 +210,21 @@ pub trait ProgressLog {
     /// method unless you display the logger manually.
     fn refresh(&mut self);
 
-    /// Output the given message.
+    /// Output the given message at the [trace](`log::Level::Trace`) level.
+    ///
+    /// See [`info`](ProgressLog::info) for an example.
+    fn trace(&self, args: Arguments<'_>);
+
+    /// Output the given message at the [debug](`log::Level::Debug`) level.
+    ///
+    /// See [`info`](ProgressLog::info) for an example.
+    fn debug(&self, args: Arguments<'_>);
+
+    /// Output the given message at the [info](`log::Level::Info`) level.
     ///
     /// For maximum flexibility, this method takes as argument the result of a
     /// [`std::format_args!`] macro. Note that there will be no output if the
-    /// logger is the [`None`] variant.
+    /// logger is [`None`].
     ///
     /// # Examples
     ///
@@ -233,6 +243,16 @@ pub trait ProgressLog {
     /// # }
     /// ```
     fn info(&self, args: Arguments<'_>);
+
+    /// Output the given message at the [warn](`log::Level::Warn`) level.
+    ///
+    /// See [`info`](ProgressLog::info) for an example.
+    fn warn(&self, args: Arguments<'_>);
+
+    /// Output the given message at the [error](`log::Level::Error`) level.
+    ///
+    /// See [`info`](ProgressLog::info) for an example.
+    fn error(&self, args: Arguments<'_>);
 
     /// Return a concurrent copy of the logger.
     ///
@@ -376,8 +396,24 @@ impl<P: ProgressLog> ProgressLog for &mut P {
         (**self).refresh();
     }
 
+    fn trace(&self, args: Arguments<'_>) {
+        (**self).trace(args);
+    }
+
+    fn debug(&self, args: Arguments<'_>) {
+        (**self).debug(args);
+    }
+
     fn info(&self, args: Arguments<'_>) {
         (**self).info(args);
+    }
+
+    fn warn(&self, args: Arguments<'_>) {
+        (**self).warn(args);
+    }
+
+    fn error(&self, args: Arguments<'_>) {
+        (**self).error(args);
     }
 
     fn concurrent(&self) -> Self::Concurrent {
@@ -515,9 +551,33 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         }
     }
 
+    fn trace(&self, args: Arguments<'_>) {
+        if let Some(pl) = self {
+            pl.trace(args);
+        }
+    }
+
+    fn debug(&self, args: Arguments<'_>) {
+        if let Some(pl) = self {
+            pl.debug(args);
+        }
+    }
+
     fn info(&self, args: Arguments<'_>) {
         if let Some(pl) = self {
             pl.info(args);
+        }
+    }
+
+    fn warn(&self, args: Arguments<'_>) {
+        if let Some(pl) = self {
+            pl.warn(args);
+        }
+    }
+
+    fn error(&self, args: Arguments<'_>) {
+        if let Some(pl) = self {
+            pl.error(args);
         }
     }
 
@@ -899,8 +959,24 @@ impl ProgressLog for ProgressLogger {
         self.start_time?.elapsed().into()
     }
 
+    fn trace(&self, args: Arguments<'_>) {
+        trace!(target: &self.log_target, "{}", std::fmt::format(args));
+    }
+
+    fn debug(&self, args: Arguments<'_>) {
+        debug!(target: &self.log_target, "{}", std::fmt::format(args));
+    }
+
     fn info(&self, args: Arguments<'_>) {
         info!(target: &self.log_target, "{}", std::fmt::format(args));
+    }
+
+    fn warn(&self, args: Arguments<'_>) {
+        warn!(target: &self.log_target, "{}", std::fmt::format(args));
+    }
+
+    fn error(&self, args: Arguments<'_>) {
+        error!(target: &self.log_target, "{}", std::fmt::format(args));
     }
 
     fn concurrent(&self) -> Self::Concurrent {
@@ -1373,8 +1449,24 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
         self.inner.lock().unwrap().refresh();
     }
 
+    fn trace(&self, args: Arguments<'_>) {
+        self.inner.lock().unwrap().trace(args);
+    }
+
+    fn debug(&self, args: Arguments<'_>) {
+        self.inner.lock().unwrap().debug(args);
+    }
+
     fn info(&self, args: Arguments<'_>) {
         self.inner.lock().unwrap().info(args);
+    }
+
+    fn warn(&self, args: Arguments<'_>) {
+        self.inner.lock().unwrap().warn(args);
+    }
+
+    fn error(&self, args: Arguments<'_>) {
+        self.inner.lock().unwrap().error(args);
     }
 
     fn concurrent(&self) -> Self::Concurrent {

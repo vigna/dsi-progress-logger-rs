@@ -33,12 +33,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         local_speed = true
     );
 
-    pl.start("Smashing pumpkins (slowly) and showing memory and local speed...");
+    pl.start("Smashing pumpkins (slowly), showing memory and local speed...");
     for _ in 0..30 {
         thread::sleep(std::time::Duration::from_millis(1000));
         pl.update();
     }
     pl.done();
+
+    pl.debug(format_args!("This is a messagge at debug level"));
+    pl.info(format_args!("This is a messagge at info level"));
+    pl.warn(format_args!("This is a messagge at warn level"));
+    pl.error(format_args!("This is a messagge at error level"));
 
     Ok(())
 }
