@@ -6,7 +6,7 @@
 
 * New methods `ProgressLog::trace`, `ProgressLog::debug`,  `ProgressLog::warn`,
   and `ProgressLog::error` with the same logic of  `ProgressLog::info`, but for
-  different log levels, and `ProgressLog::log` that takes a `Level` argument.
+  different log levels.
 
 ## [0.6.0] - 2025-02-04
 
