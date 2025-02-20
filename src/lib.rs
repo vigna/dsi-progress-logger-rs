@@ -205,6 +205,12 @@ pub trait ProgressLog {
     /// logger has not been started.
     fn elapsed(&self) -> Option<Duration>;
 
+    /// Return the last count the logger has been set to.
+    /// 
+    /// Note that you can call this method even after the logger has been
+    /// [stopped](ProgressLog::stop).
+    fn count(&self) -> usize;
+
     /// Refreshe memory information, if previously requested with
     /// [`display_memory`](#method.display_memory). You do not need to call this
     /// method unless you display the logger manually.
@@ -261,9 +267,12 @@ pub trait ProgressLog {
     /// ProgressLog` to pass a logger as an argument, and then creating a
     /// concurrent copy of the logger with this method. If the original logger
     /// is `None`, the concurrent copy will be `None` as well.
+    /// 
+    /// Note that the result of the method is a copy—it will not share the state
+    /// of the original logger.
     ///
-    /// Concurrent logger implementations can just return
-    /// [`dup`](ConcurrentProgressLog::dup).
+    /// Concurrent logger implementations can just return a duplicate of
+    /// themselves. [`dup`](ConcurrentProgressLog::dup).
     fn concurrent(&self) -> Self::Concurrent;
 }
 
@@ -390,6 +399,10 @@ impl<P: ProgressLog> ProgressLog for &mut P {
 
     fn elapsed(&self) -> Option<Duration> {
         (**self).elapsed()
+    }
+
+    fn count(&self) -> usize {
+        (**self).count()
     }
 
     fn refresh(&mut self) {
@@ -543,6 +556,10 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
 
     fn elapsed(&self) -> Option<Duration> {
         self.as_ref().and_then(|pl| pl.elapsed())
+    }
+
+    fn count(&self) -> usize {
+        self.as_ref().map(|pl| pl.count()).unwrap_or(0)
     }
 
     fn refresh(&mut self) {
@@ -959,6 +976,10 @@ impl ProgressLog for ProgressLogger {
         self.start_time?.elapsed().into()
     }
 
+    fn count(&self) -> usize {
+        self.count
+    }
+
     fn trace(&self, args: Arguments<'_>) {
         trace!(target: &self.log_target, "{}", std::fmt::format(args));
     }
@@ -1306,12 +1327,10 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
 
     fn log(&mut self, now: Instant) {
         self.inner.lock().unwrap().log(now);
-        self.local_count = 0;
     }
 
     fn log_if(&mut self, now: Instant) {
         self.inner.lock().unwrap().log_if(now);
-        self.local_count = 0;
     }
 
     fn add_to_count(&mut self, count: usize) {
@@ -1428,21 +1447,22 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
 
     fn stop(&mut self) {
         self.inner.lock().unwrap().stop();
-        self.local_count = 0;
     }
 
     fn done(&mut self) {
         self.inner.lock().unwrap().done();
-        self.local_count = 0;
     }
 
     fn done_with_count(&mut self, count: usize) {
         self.inner.lock().unwrap().done_with_count(count);
-        self.local_count = 0;
     }
 
     fn elapsed(&self) -> Option<Duration> {
         self.inner.lock().unwrap().elapsed()
+    }
+
+    fn count(&self) -> usize {
+        self.inner.lock().unwrap().count()
     }
 
     fn refresh(&mut self) {

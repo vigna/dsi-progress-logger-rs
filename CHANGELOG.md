@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.9.0] - 2025-02-20
+
+### New
+
+* Added missing `ProgressLog::count` method.
+
 ## [0.7.0] - 2025-02-16
 
 ### New
