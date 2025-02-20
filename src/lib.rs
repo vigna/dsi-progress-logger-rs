@@ -206,7 +206,7 @@ pub trait ProgressLog {
     fn elapsed(&self) -> Option<Duration>;
 
     /// Return the last count the logger has been set to.
-    /// 
+    ///
     /// Note that you can call this method even after the logger has been
     /// [stopped](ProgressLog::stop).
     fn count(&self) -> usize;
@@ -267,7 +267,7 @@ pub trait ProgressLog {
     /// ProgressLog` to pass a logger as an argument, and then creating a
     /// concurrent copy of the logger with this method. If the original logger
     /// is `None`, the concurrent copy will be `None` as well.
-    /// 
+    ///
     /// Note that the result of the method is a copy—it will not share the state
     /// of the original logger.
     ///
