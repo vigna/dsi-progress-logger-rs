@@ -882,7 +882,7 @@ impl ProgressLog for ProgressLogger {
 
     fn item_name(&mut self, item_name: impl AsRef<str>) -> &mut Self {
         self.item_name = item_name.as_ref().into();
-        self.items_name = pluralize(item_name.as_ref(), 2 ,false);
+        self.items_name = pluralize(item_name.as_ref(), 2, false);
         self
     }
 
@@ -1034,7 +1034,7 @@ impl Display for ProgressLogger {
                     f.write_fmt(format_args!(
                         " [{} {}, ",
                         count_fmtd,
-                        if self.count == 1  {
+                        if self.count == 1 {
                             &self.item_name
                         } else {
                             &self.items_name
@@ -1051,11 +1051,11 @@ impl Display for ProgressLogger {
                 f.write_fmt(format_args!(
                     "{} {}, {}, ",
                     count_fmtd,
-                        if self.count == 1  {
-                            &self.item_name
-                        } else {
-                            &self.items_name
-                        },
+                    if self.count == 1 {
+                        &self.item_name
+                    } else {
+                        &self.items_name
+                    },
                     TimeUnit::pretty_print(elapsed.as_millis()),
                 ))?;
 
