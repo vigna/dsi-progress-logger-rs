@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.8.1] - 2025-03-08
+
+### New
+
+* The plural of an item name is now cached as its computation is expensive.
+
 ## [0.8.0] - 2025-02-20
 
 ### New

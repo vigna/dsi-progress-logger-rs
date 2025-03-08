@@ -699,6 +699,10 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 pub struct ProgressLogger {
     /// The name of an item. Defaults to `item`.
     item_name: String,
+    /// The pluralized name of an item. Defaults to `items`. It is quite
+    /// expensive to compute with [`pluralize`](pluralizer::pluralize), hence
+    /// the caching.
+    items_name: String,
     /// The log interval. Defaults to 10 seconds.
     log_interval: Duration,
     /// The expected number of updates. If set, the logger will display the percentage of completion and
@@ -738,6 +742,7 @@ impl Default for ProgressLogger {
     fn default() -> Self {
         Self {
             item_name: "item".into(),
+            items_name: "items".into(),
             log_interval: Duration::from_secs(10),
             expected_updates: None,
             time_unit: None,
@@ -768,6 +773,7 @@ impl Clone for ProgressLogger {
     fn clone(&self) -> Self {
         Self {
             item_name: self.item_name.clone(),
+            items_name: self.items_name.clone(),
             log_interval: self.log_interval,
             time_unit: self.time_unit,
             local_speed: self.local_speed,
@@ -827,7 +833,7 @@ impl ProgressLogger {
         f.write_fmt(format_args!(
             "{:.2} {}/{}, {:.2} {}/{}",
             items_per_second * time_unit_speed.as_seconds(),
-            pluralize(&self.item_name, 2, false),
+            self.items_name,
             time_unit_speed.label(),
             seconds_per_item / time_unit_timing.as_seconds(),
             time_unit_timing.label(),
@@ -876,6 +882,7 @@ impl ProgressLog for ProgressLogger {
 
     fn item_name(&mut self, item_name: impl AsRef<str>) -> &mut Self {
         self.item_name = item_name.as_ref().into();
+        self.items_name = pluralize(item_name.as_ref(), 2 ,false);
         self
     }
 
@@ -1027,7 +1034,11 @@ impl Display for ProgressLogger {
                     f.write_fmt(format_args!(
                         " [{} {}, ",
                         count_fmtd,
-                        pluralize(&self.item_name, self.count as isize, false)
+                        if self.count == 1  {
+                            &self.item_name
+                        } else {
+                            &self.items_name
+                        }
                     ))?;
                     self.fmt_timing_speed(f, seconds_per_item)?;
                     f.write_fmt(format_args!("]"))?
@@ -1040,7 +1051,11 @@ impl Display for ProgressLogger {
                 f.write_fmt(format_args!(
                     "{} {}, {}, ",
                     count_fmtd,
-                    pluralize(&self.item_name, self.count as isize, false),
+                        if self.count == 1  {
+                            &self.item_name
+                        } else {
+                            &self.items_name
+                        },
                     TimeUnit::pretty_print(elapsed.as_millis()),
                 ))?;
 
