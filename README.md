@@ -30,8 +30,10 @@ the same underlying [`ProgressLog`], that can be passed to other threads. As a
 result, a [`ConcurrentProgressLog`] can be used with methods like
 [`rayon::ParallelIterator::for_each_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.for_each_with),
 [`rayon::ParallelIterator::map_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.map_with),
-and so on. Convenience constructors and macros make concurrent progress logging
-as easy as single-threaded logging.
+and so on (but in this case do not use the [`display_memory`] method, as [this
+can lead to a deadlock](https://github.com/rayon-rs/rayon/issues/592)).
+Convenience constructors and macros make concurrent progress logging as easy as
+single-threaded logging.
 
 ## Optional Logging
 
@@ -67,13 +69,14 @@ however those of the authors only and do not necessarily reflect those of the
 European Union or the Italian MUR. Neither the European Union nor the Italian
 MUR can be held responsible for them.
 
-[`ProgressLog`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html
-[`ProgressLogger`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.ProgressLogger.html
+[`ProgressLog`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html>
+[`ProgressLogger`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.ProgressLogger.html>
 [`ConcurrentProgressLog`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ConcurrentProgressLog.html>
 [`ConcurrentWrapper`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.ConcurrentWrapper.html>
-[`info`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.info
+[`info`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.info>
+[`display_memory`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.display_memory>
 [`ProgressLog::concurrent`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.concurrent>
-[`it.unimi.dsi.util.ProgressLogger`]: https://dsiutils.di.unimi.it/docs/it/unimi/dsi/logging/ProgressLogger.html
-[DSI Utilities]: https://dsiutils.di.unimi.it/
-[`log`]: https://docs.rs/log
+[`it.unimi.dsi.util.ProgressLogger`]: <https://dsiutils.di.unimi.it/docs/it/unimi/dsi/logging/ProgressLogger.html>
+[DSI Utilities]: <https://dsiutils.di.unimi.it/>
+[`log`]: <https://docs.rs/log>
 [`no_logging!`]: <https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/macro.no_logging.html>

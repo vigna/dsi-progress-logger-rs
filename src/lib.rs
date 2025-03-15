@@ -44,6 +44,9 @@ pub use utils::*;
 /// calling [`display_memory`](ProgressLog::display_memory). Memory is read from
 /// system data by the [`sysinfo`] crate, and will be updated at each log
 /// interval (note that this will slightly slow down the logging process).
+/// However, never use this feature in a
+/// [`rayon`](https://crates.io/crates/rayon) environment, as [this can lead to
+/// a deadlock](https://github.com/rayon-rs/rayon/issues/592).
 ///
 /// At any time, displaying the progress logger will give you time information
 /// up to the present. However,  since it is impossible to update the memory
@@ -58,9 +61,9 @@ pub use utils::*;
 /// After you finish a run of the progress logger, can call
 /// [`start`](ProgressLog::start) again measure another activity.
 ///
-/// As explained in the [crate documentation](crate), we suggest using
-/// `&mut impl ProgressLog` to pass a logger as an argument, to be
-/// able to use optional logging.
+/// As explained in the [crate documentation](crate), we suggest using `&mut
+/// impl ProgressLog` to pass a logger as an argument, to be able to use
+/// optional logging.
 ///
 /// # Examples
 ///
@@ -89,6 +92,10 @@ pub trait ProgressLog {
     /// - the [available memory](sysinfo::System::available_memory);
     /// - the [free memory](`sysinfo::System::free_memory);
     /// - the [total amount](sysinfo::System::total_memory) of memory.
+    ///
+    /// Never use this feature in a [`rayon`](https://crates.io/crates/rayon)
+    /// environment, as [this can lead to a
+    /// deadlock](https://github.com/rayon-rs/rayon/issues/592).
     fn display_memory(&mut self, display_memory: bool) -> &mut Self;
 
     /// Set the name of an item.
@@ -279,28 +286,30 @@ pub trait ProgressLog {
 /// Concurrent logging trait.
 ///
 /// This trait extends [`ProgressLog`] by adding a
-/// [`dup`](ConcurrentProgressLog::dup) method that duplicates the logger
-/// and adding the [`Clone`], [`Sync`], and [`Send`] traits.
+/// [`dup`](ConcurrentProgressLog::dup) method that duplicates the logger and
+/// adding the [`Clone`], [`Sync`], and [`Send`] traits.
 ///
-/// By contract, [`Clone`] implementations must return a new logger
-/// updating the same internal state, so you can easily use a
-/// [`ConcurrentProgressLog`] in methods like
+/// By contract, [`Clone`] implementations must return a new logger updating the
+/// same internal state, so you can easily use a [`ConcurrentProgressLog`] in
+/// methods like
 /// [`rayon::ParallelIterator::for_each_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.for_each_with),
 /// [`rayon::ParallelIterator::map_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.map_with),
-/// and so on.
+/// and so on. In a [`rayon`](https://docs.rs/rayon) environment, however, you
+/// cannot use [`display_memory`](ProgressLog::display_memory) because [this can
+/// lead to a deadlock](https://github.com/rayon-rs/rayon/issues/592).
 ///
 /// Note that [`ProgressLogger`]'s [`Clone`
 /// implementation](ProgressLogger#impl-Clone-for-ProgressLogger) has a
 /// completely different semantics.
 ///
 /// As explained in the [crate documentation](crate), we suggest using `&mut
-/// Self::Concurrent` to pass a concurrent logger as an argument, to
-/// be able to use optional logging.
+/// Self::Concurrent` to pass a concurrent logger as an argument, to be able to
+/// use optional logging.
 ///
 /// # Examples
 ///
-/// See the [`ConcurrentWrapper`] documentation.
-///     type Concurrent = Option<P::Concurrent>;
+/// See the [`ConcurrentWrapper`] documentation. type Concurrent =
+///     Option<P::Concurrent>;
 ///
 pub trait ConcurrentProgressLog: ProgressLog + Sync + Send + Clone {
     /// The type returned by [`dup`](ConcurrentProgressLog::dup).
@@ -1152,8 +1161,8 @@ impl Display for ProgressLogger {
 /// cpl.done();
 /// ```
 ///
-/// You can obtain the same behavior with [`rayon`](https://docs.rs/rayon) using
-/// methods such as
+/// You can obtain the same behavior with
+/// [`rayon`](https://crates.io/crates/rayon) using methods such as
 /// [`for_each_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.for_each_with)
 /// and
 /// [`map_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.map_with):
