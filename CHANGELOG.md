@@ -6,6 +6,10 @@
 
 * The plural of an item name is now cached as its computation is expensive.
 
+* Removed `multithread` feature from `sysinfo` dependency, and
+  documented deadlock problems with `rayon` and `sysinfo`
+  when using `display_memory`.
+
 ## [0.8.0] - 2025-02-20
 
 ### New

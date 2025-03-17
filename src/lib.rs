@@ -45,8 +45,12 @@ pub use utils::*;
 /// system data by the [`sysinfo`] crate, and will be updated at each log
 /// interval (note that this will slightly slow down the logging process).
 /// However, never use this feature in a
-/// [`rayon`](https://crates.io/crates/rayon) environment, as [this can lead to
-/// a deadlock](https://github.com/rayon-rs/rayon/issues/592).
+/// [`rayon`](https://crates.io/crates/rayon) environment if another crate in
+/// your compilation unit depends on on
+/// [`sysinfo`](https://crates.io/crates/sysinfo)'s (default) `multithread`
+/// feature, as [this can lead to a
+/// deadlock](https://github.com/rayon-rs/rayon/issues/592) .
+///
 ///
 /// At any time, displaying the progress logger will give you time information
 /// up to the present. However,  since it is impossible to update the memory
@@ -94,8 +98,10 @@ pub trait ProgressLog {
     /// - the [total amount](sysinfo::System::total_memory) of memory.
     ///
     /// Never use this feature in a [`rayon`](https://crates.io/crates/rayon)
-    /// environment, as [this can lead to a
-    /// deadlock](https://github.com/rayon-rs/rayon/issues/592).
+    /// environment if another crate in your compilation unit depends on on
+    /// [`sysinfo`](https://crates.io/crates/sysinfo)'s (default) `multithread`
+    /// feature, as [this can lead to a
+    /// deadlock](https://github.com/rayon-rs/rayon/issues/592) .
     fn display_memory(&mut self, display_memory: bool) -> &mut Self;
 
     /// Set the name of an item.
@@ -295,8 +301,11 @@ pub trait ProgressLog {
 /// [`rayon::ParallelIterator::for_each_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.for_each_with),
 /// [`rayon::ParallelIterator::map_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.map_with),
 /// and so on. In a [`rayon`](https://docs.rs/rayon) environment, however, you
-/// cannot use [`display_memory`](ProgressLog::display_memory) because [this can
-/// lead to a deadlock](https://github.com/rayon-rs/rayon/issues/592).
+/// cannot use [`display_memory`](ProgressLog::display_memory) if another crate
+/// in your compilation unit depends on on
+/// [`sysinfo`](https://crates.io/crates/sysinfo)'s (default) `multithread`
+/// feature, as [this can lead to a
+/// deadlock](https://github.com/rayon-rs/rayon/issues/592) .
 ///
 /// Note that [`ProgressLogger`]'s [`Clone`
 /// implementation](ProgressLogger#impl-Clone-for-ProgressLogger) has a
