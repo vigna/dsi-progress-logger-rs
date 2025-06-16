@@ -25,8 +25,8 @@ pub use utils::*;
 /// [`update`](ProgressLog::update), which increases the item counter, and will
 /// log progress information if enough time has passed since the last log.
 /// [`light_update`](ProgressLog::light_update) will perform a time check only
-///  on updates multiples of
-/// [`LIGHT_UPDATE_MASK`](ProgressLogger::LIGHT_UPDATE_MASK) + 1; it  should be
+///  on a subset of updates (e.g., for [`ProgressLogger`], multiples of
+/// [`LIGHT_UPDATE_MASK`](ProgressLogger::LIGHT_UPDATE_MASK) + 1); it  should be
 /// used when the activity has an extremely low cost that is comparable to that
 /// of the time check (a call to [`Instant::now()`]) itself.
 ///
@@ -211,7 +211,7 @@ pub trait ProgressLog {
     ///   multicore computation) but before printing the final stats you want
     ///   the internal counter to contain an exact value;
     /// * you have used the logger as a handy timer, calling just
-    ///   [`start`](#fields.start) and this method.
+    ///   [`start`](ProgressLog::start) and this method.
     fn done_with_count(&mut self, count: usize);
 
     /// Return the elapsed time since the logger was started, or `None` if the
