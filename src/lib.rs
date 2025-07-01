@@ -224,7 +224,7 @@ pub trait ProgressLog {
     /// [stopped](ProgressLog::stop).
     fn count(&self) -> usize;
 
-    /// Refreshe memory information, if previously requested with
+    /// Refresh memory information, if previously requested with
     /// [`display_memory`](#method.display_memory). You do not need to call this
     /// method unless you display the logger manually.
     fn refresh(&mut self);
@@ -324,9 +324,9 @@ pub trait ConcurrentProgressLog: ProgressLog + Sync + Send + Clone {
     /// The type returned by [`dup`](ConcurrentProgressLog::dup).
     type Duplicated: ConcurrentProgressLog;
 
-    /// Duplicate the concurrent progress logger, obtaning a new one.
+    /// Duplicate the concurrent progress logger, obtaining a new one.
     ///
-    /// Note that the this method has the same sematics of [`ProgressLogger`'s
+    /// Note that the this method has the same semantics of [`ProgressLogger`'s
     /// `Clone` implementation](ProgressLogger#impl-Clone-for-ProgressLogger),
     /// but in a [`ConcurrentProgressLog`] by contract [cloning must generate
     /// copies with the same underlying logger](ConcurrentProgressLog).
@@ -1223,7 +1223,7 @@ impl Default for ConcurrentWrapper {
 }
 
 impl<P: ProgressLog + Clone> Clone for ConcurrentWrapper<P> {
-    /// Clone the concurrent wrapper, obtaning a new one with the same
+    /// Clone the concurrent wrapper, obtaining a new one with the same
     /// threshold, with a local count of zero, and with the same inner
     /// [`ProgressLog`].
     fn clone(&self) -> Self {
@@ -1326,13 +1326,13 @@ impl<P: ProgressLog> ConcurrentWrapper<P> {
         self.inner
             .lock()
             .unwrap()
-            .add_to_count(self.local_count as _);
+            .update_with_count(self.local_count as _);
         self.local_count = 0;
     }
 }
 
 impl<P: ProgressLog + Clone> ConcurrentWrapper<P> {
-    /// Duplicates the concurrent wrapper, obtaning a new one with the same
+    /// Duplicates the concurrent wrapper, obtaining a new one with the same
     /// threshold, with a local count of zero, and with an inner
     /// [`ProgressLog`] that is a clone of the original one.
     pub fn dup(&self) -> Self {

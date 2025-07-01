@@ -1,5 +1,13 @@
 # Change Log
 
+## [0.8.2] - 2025-07-01
+
+### New
+
+* `ConcurrentWrapper::flush` now forces a log of the underlying logger, so
+  even if parallelism brings the number of items per clone below the
+  logging threshold the user will see some output.
+
 ## [0.8.1] - 2025-03-08
 
 ### New
