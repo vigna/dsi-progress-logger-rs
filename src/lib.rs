@@ -821,10 +821,10 @@ impl Clone for ProgressLogger {
 macro_rules! progress_logger {
     ($($method:ident = $arg:expr),* $(,)?) => {
         {
-            let mut pl = ::dsi_progress_logger::ProgressLogger::default();
-            ::dsi_progress_logger::ProgressLog::log_target(&mut pl, ::std::module_path!());
+            let mut pl = $crate::ProgressLogger::default();
+            $crate::ProgressLog::log_target(&mut pl, ::std::module_path!());
             $(
-                ::dsi_progress_logger::ProgressLog::$method(&mut pl, $arg);
+                $crate::ProgressLog::$method(&mut pl, $arg);
             )*
             pl
         }
@@ -1250,10 +1250,10 @@ impl<P: ProgressLog + Clone> Clone for ConcurrentWrapper<P> {
 macro_rules! concurrent_progress_logger {
     ($($method:ident = $arg:expr),* $(,)?) => {
         {
-            let mut cpl = ::dsi_progress_logger::ConcurrentWrapper::default();
-            ::dsi_progress_logger::ProgressLog::log_target(&mut cpl, ::std::module_path!());
+            let mut cpl = $crate::ConcurrentWrapper::default();
+            $crate::ProgressLog::log_target(&mut cpl, ::std::module_path!());
             $(
-                ::dsi_progress_logger::ProgressLog::$method(&mut cpl, $arg);
+                $crate::ProgressLog::$method(&mut cpl, $arg);
             )*
             cpl
         }
@@ -1548,7 +1548,7 @@ impl Display for ConcurrentWrapper {
 #[macro_export]
 macro_rules! no_logging {
     () => {
-        &mut Option::<dsi_progress_logger::ConcurrentWrapper::<dsi_progress_logger::ProgressLogger>>::None
+        &mut Option::<$crate::ConcurrentWrapper<dsi_progress_logger::ProgressLogger>>::None
     };
 }
 
