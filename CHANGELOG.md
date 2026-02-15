@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.8.4] - 2026-02-15
+
+### Changed
+
+* Bumped Rust version to 1.88 as required by `sysinfo`.
+
 ## [0.8.3] - 2026-02-15
 
 ### Fixed
