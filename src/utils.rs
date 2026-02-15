@@ -111,8 +111,7 @@ pub fn humanize(val: f64) -> String {
 }
 
 #[cfg(test)]
-
-mod test {
+mod tests {
     use super::*;
     #[test]
     fn test_scale() {

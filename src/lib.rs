@@ -25,8 +25,8 @@ pub use utils::*;
 /// [`update`](ProgressLog::update), which increases the item counter, and will
 /// log progress information if enough time has passed since the last log.
 /// [`light_update`](ProgressLog::light_update) will perform a time check only
-///  on a subset of updates (e.g., for [`ProgressLogger`], multiples of
-/// [`LIGHT_UPDATE_MASK`](ProgressLogger::LIGHT_UPDATE_MASK) + 1); it  should be
+/// on a subset of updates (e.g., for [`ProgressLogger`], multiples of
+/// [`LIGHT_UPDATE_MASK`](ProgressLogger::LIGHT_UPDATE_MASK) + 1); it should be
 /// used when the activity has an extremely low cost that is comparable to that
 /// of the time check (a call to [`Instant::now()`]) itself.
 ///
@@ -46,20 +46,20 @@ pub use utils::*;
 /// interval (note that this will slightly slow down the logging process).
 /// However, never use this feature in a
 /// [`rayon`](https://crates.io/crates/rayon) environment if another crate in
-/// your compilation unit depends on on
+/// your compilation unit depends on
 /// [`sysinfo`](https://crates.io/crates/sysinfo)'s (default) `multithread`
 /// feature, as [this can lead to a
 /// deadlock](https://github.com/rayon-rs/rayon/issues/592) .
 ///
 ///
 /// At any time, displaying the progress logger will give you time information
-/// up to the present. However,  since it is impossible to update the memory
+/// up to the present. However, since it is impossible to update the memory
 /// information from the [`Display::fmt`] implementation, you should call
 /// [`refresh`](ProgressLog::refresh) before displaying the logger on your own.
 ///
 /// When the activity is over, you call [`stop`](ProgressLog::stop), which fixes
 /// the final time, and possibly display again the logger.
-///  [`done`](ProgressLog::done) will stop the logger, print `Completed.`, and
+/// [`done`](ProgressLog::done) will stop the logger, print `Completed.`, and
 /// display the final stats.
 ///
 /// After you finish a run of the progress logger, can call
@@ -94,11 +94,11 @@ pub trait ProgressLog {
     /// - the [virtual-memory size](sysinfo::Process::virtual_memory) of the
     ///   process that created the logger;
     /// - the [available memory](sysinfo::System::available_memory);
-    /// - the [free memory](`sysinfo::System::free_memory);
+    /// - the [free memory](sysinfo::System::free_memory);
     /// - the [total amount](sysinfo::System::total_memory) of memory.
     ///
     /// Never use this feature in a [`rayon`](https://crates.io/crates/rayon)
-    /// environment if another crate in your compilation unit depends on on
+    /// environment if another crate in your compilation unit depends on
     /// [`sysinfo`](https://crates.io/crates/sysinfo)'s (default) `multithread`
     /// feature, as [this can lead to a
     /// deadlock](https://github.com/rayon-rs/rayon/issues/592) .
@@ -189,7 +189,7 @@ pub trait ProgressLog {
     /// Increase the count but checks whether it is time to log only after an
     /// implementation-defined number of calls.
     ///
-    /// Useful for very short activities with respect to which  checking the
+    /// Useful for very short activities with respect to which checking the
     /// time is expensive.
     fn light_update(&mut self);
 
@@ -302,7 +302,7 @@ pub trait ProgressLog {
 /// [`rayon::ParallelIterator::map_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.map_with),
 /// and so on. In a [`rayon`](https://docs.rs/rayon) environment, however, you
 /// cannot use [`display_memory`](ProgressLog::display_memory) if another crate
-/// in your compilation unit depends on on
+/// in your compilation unit depends on
 /// [`sysinfo`](https://crates.io/crates/sysinfo)'s (default) `multithread`
 /// feature, as [this can lead to a
 /// deadlock](https://github.com/rayon-rs/rayon/issues/592) .
@@ -317,9 +317,7 @@ pub trait ProgressLog {
 ///
 /// # Examples
 ///
-/// See the [`ConcurrentWrapper`] documentation. type Concurrent =
-///     Option<P::Concurrent>;
-///
+/// See the [`ConcurrentWrapper`] documentation.
 pub trait ConcurrentProgressLog: ProgressLog + Sync + Send + Clone {
     /// The type returned by [`dup`](ConcurrentProgressLog::dup).
     type Duplicated: ConcurrentProgressLog;
@@ -508,8 +506,6 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         self
     }
 
-    /// Sets whether to display additionally the speed achieved during the last
-    /// log interval.
     fn local_speed(&mut self, local_speed: bool) -> &mut Self {
         if let Some(pl) = self {
             pl.local_speed(local_speed);
@@ -702,7 +698,7 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 /// # }
 /// ```
 ///
-/// This progress logger will display information about  memory usage:
+/// This progress logger will display information about memory usage:
 ///
 /// ```rust
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -718,8 +714,7 @@ pub struct ProgressLogger {
     /// The name of an item. Defaults to `item`.
     item_name: String,
     /// The pluralized name of an item. Defaults to `items`. It is quite
-    /// expensive to compute with [`pluralize`](pluralizer::pluralize), hence
-    /// the caching.
+    /// expensive to compute with [`pluralize`], hence the caching.
     items_name: String,
     /// The log interval. Defaults to 10 seconds.
     log_interval: Duration,
@@ -980,14 +975,13 @@ impl ProgressLog for ProgressLogger {
 
     fn stop(&mut self) {
         self.stop_time = Some(Instant::now());
+        // just to avoid wrong reuses
         self.expected_updates = None;
     }
 
     fn done(&mut self) {
         self.stop();
         info!(target: &self.log_target, "Completed.");
-        // just to avoid wrong reuses
-        self.expected_updates = None;
         self.refresh();
         info!(target: &self.log_target, "{}", self);
     }
@@ -998,7 +992,8 @@ impl ProgressLog for ProgressLogger {
     }
 
     fn elapsed(&self) -> Option<Duration> {
-        self.start_time?.elapsed().into()
+        let start_time = self.start_time?;
+        Some(self.stop_time.unwrap_or_else(Instant::now) - start_time)
     }
 
     fn count(&self) -> usize {
@@ -1528,8 +1523,6 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
 }
 
 /// This implementation just calls [`flush`](ConcurrentWrapper::flush),
-///     type Concurrent = Option<P::Concurrent>;
-///
 /// to guarantee that all updates are correctly passed to the underlying logger.
 impl<P: ProgressLog> Drop for ConcurrentWrapper<P> {
     fn drop(&mut self) {
@@ -1548,13 +1541,13 @@ impl Display for ConcurrentWrapper {
 #[macro_export]
 macro_rules! no_logging {
     () => {
-        &mut Option::<$crate::ConcurrentWrapper<dsi_progress_logger::ProgressLogger>>::None
+        &mut Option::<$crate::ConcurrentWrapper<$crate::ProgressLogger>>::None
     };
 }
 
 pub mod prelude {
     pub use super::{
         concurrent_progress_logger, no_logging, progress_logger, ConcurrentProgressLog,
-        ConcurrentWrapper, ProgressLog, ProgressLogger,
+        ConcurrentWrapper, ProgressLog, ProgressLogger, TimeUnit,
     };
 }

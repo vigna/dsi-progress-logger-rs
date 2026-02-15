@@ -31,7 +31,7 @@ result, a [`ConcurrentProgressLog`] can be used with methods like
 [`rayon::ParallelIterator::for_each_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.for_each_with),
 [`rayon::ParallelIterator::map_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.map_with),
 and so on (but in this case do not use the [`display_memory`] method if another
-crate in your compilation unit depends on on
+crate in your compilation unit depends on
 [`sysinfo`](https://crates.io/crates/sysinfo)'s (default) `multithread` feature,
 as [this can lead to a deadlock](https://github.com/rayon-rs/rayon/issues/592)).
 Convenience constructors and macros make concurrent progress logging as easy as

@@ -1,5 +1,16 @@
 # Change Log
 
+## [0.8.3] - 2026-02-15
+
+### Fixed
+
+* `ProgressLog::elapsed` now returns the elapsed time after 
+  a stop, instead of the time since the last start.
+
+### Changed
+
+* Updated to `sysinfo` 0.38.
+
 ## [0.8.2] - 2025-07-01
 
 ### New

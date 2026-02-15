@@ -40,10 +40,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     pl.done();
 
-    pl.debug(format_args!("This is a messagge at debug level"));
-    pl.info(format_args!("This is a messagge at info level"));
-    pl.warn(format_args!("This is a messagge at warn level"));
-    pl.error(format_args!("This is a messagge at error level"));
+    pl.debug(format_args!("This is a message at debug level"));
+    pl.info(format_args!("This is a message at info level"));
+    pl.warn(format_args!("This is a message at warn level"));
+    pl.error(format_args!("This is a message at error level"));
 
     Ok(())
 }
