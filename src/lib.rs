@@ -1547,7 +1547,7 @@ macro_rules! no_logging {
 
 pub mod prelude {
     pub use super::{
-        concurrent_progress_logger, no_logging, progress_logger, ConcurrentProgressLog,
-        ConcurrentWrapper, ProgressLog, ProgressLogger, TimeUnit,
+        ConcurrentProgressLog, ConcurrentWrapper, ProgressLog, ProgressLogger, TimeUnit,
+        concurrent_progress_logger, no_logging, progress_logger,
     };
 }
