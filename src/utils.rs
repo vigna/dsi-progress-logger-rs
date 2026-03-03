@@ -28,7 +28,7 @@ impl TimeUnit {
         TimeUnit::Days,
     ];
 
-    pub fn label(&self) -> &'static str {
+    pub const fn label(&self) -> &'static str {
         match self {
             TimeUnit::NanoSeconds => "ns",
             TimeUnit::MicroSeconds => "μs",
@@ -40,7 +40,7 @@ impl TimeUnit {
         }
     }
 
-    pub fn as_seconds(&self) -> f64 {
+    pub const fn as_seconds(&self) -> f64 {
         match self {
             TimeUnit::NanoSeconds => 1.0e-9,
             TimeUnit::MicroSeconds => 1.0e-6,
@@ -52,20 +52,24 @@ impl TimeUnit {
         }
     }
 
-    pub fn nice_time_unit(seconds: f64) -> Self {
-        for unit in TimeUnit::VALUES.iter().rev() {
-            if seconds >= unit.as_seconds() {
-                return *unit;
+    pub const fn nice_time_unit(seconds: f64) -> Self {
+        let mut i = TimeUnit::VALUES.len();
+        while i > 0 {
+            i -= 1;
+            if seconds >= TimeUnit::VALUES[i].as_seconds() {
+                return TimeUnit::VALUES[i];
             }
         }
         TimeUnit::NanoSeconds
     }
 
-    pub fn nice_speed_unit(seconds: f64) -> Self {
-        for unit in TimeUnit::VALUES[3..].iter() {
-            if seconds <= unit.as_seconds() {
-                return *unit;
+    pub const fn nice_speed_unit(seconds: f64) -> Self {
+        let mut i = 3;
+        while i < TimeUnit::VALUES.len() {
+            if seconds <= TimeUnit::VALUES[i].as_seconds() {
+                return TimeUnit::VALUES[i];
             }
+            i += 1;
         }
         TimeUnit::Days
     }
@@ -93,13 +97,15 @@ impl TimeUnit {
     }
 }
 
-pub fn scale(mut val: f64) -> (f64, &'static str) {
+pub const fn scale(mut val: f64) -> (f64, &'static str) {
     const UNITS: &[&str] = &["", "k", "M", "G", "T", "P", "E", "Z", "Y"];
-    for unit in UNITS.iter() {
+    let mut i = 0;
+    while i < UNITS.len() {
         if val < 1000.0 {
-            return (val, unit);
+            return (val, UNITS[i]);
         }
         val /= 1000.0;
+        i += 1;
     }
 
     (val, "Y")
