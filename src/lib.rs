@@ -114,7 +114,11 @@ pub trait ProgressLog {
     ///
     /// If not [`None`], the logger will display the percentage of completion
     /// and an estimate of the time to completion.
-    fn expected_updates(&mut self, expected_updates: Option<usize>) -> &mut Self;
+    ///
+    /// Note that you do not need to use a [`Some`](Option::Some)
+    /// wrapper around the argument, as the method will automatically convert it
+    /// to an [`Option`] type.
+    fn expected_updates(&mut self, expected_updates: impl Into<Option<usize>>) -> &mut Self;
 
     /// Set the time unit to use for speed.
     ///
@@ -122,7 +126,11 @@ pub trait ProgressLog {
     /// instead of making a choice of readable unit based on the elapsed time.
     /// Moreover, large numbers will not be thousands separated. This behavior
     /// is useful when the output of the logger must be parsed.
-    fn time_unit(&mut self, time_unit: Option<TimeUnit>) -> &mut Self;
+    ///
+    /// Note that you do not need to use a [`Some`](Option::Some)
+    /// wrapper around the argument, as the method will automatically convert it
+    /// to an [`Option`] type.
+    fn time_unit(&mut self, time_unit: impl Into<Option<TimeUnit>>) -> &mut Self;
 
     /// Set whether to display additionally the speed achieved during the last
     /// log interval.
@@ -361,13 +369,13 @@ impl<P: ProgressLog> ProgressLog for &mut P {
         self
     }
 
-    fn expected_updates(&mut self, expected_updates: Option<usize>) -> &mut Self {
-        (**self).expected_updates(expected_updates);
+    fn expected_updates(&mut self, expected_updates: impl Into<Option<usize>>) -> &mut Self {
+        (**self).expected_updates(expected_updates.into());
         self
     }
 
-    fn time_unit(&mut self, time_unit: Option<TimeUnit>) -> &mut Self {
-        (**self).time_unit(time_unit);
+    fn time_unit(&mut self, time_unit: impl Into<Option<TimeUnit>>) -> &mut Self {
+        (**self).time_unit(time_unit.into());
         self
     }
 
@@ -492,16 +500,16 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         self
     }
 
-    fn expected_updates(&mut self, expected_updates: Option<usize>) -> &mut Self {
+    fn expected_updates(&mut self, expected_updates: impl Into<Option<usize>>) -> &mut Self {
         if let Some(pl) = self {
-            pl.expected_updates(expected_updates);
+            pl.expected_updates(expected_updates.into());
         }
         self
     }
 
-    fn time_unit(&mut self, time_unit: Option<TimeUnit>) -> &mut Self {
+    fn time_unit(&mut self, time_unit: impl Into<Option<TimeUnit>>) -> &mut Self {
         if let Some(pl) = self {
-            pl.time_unit(time_unit);
+            pl.time_unit(time_unit.into());
         }
         self
     }
@@ -904,13 +912,13 @@ impl ProgressLog for ProgressLogger {
         self
     }
 
-    fn expected_updates(&mut self, expected_updates: Option<usize>) -> &mut Self {
-        self.expected_updates = expected_updates;
+    fn expected_updates(&mut self, expected_updates: impl Into<Option<usize>>) -> &mut Self {
+        self.expected_updates = expected_updates.into();
         self
     }
 
-    fn time_unit(&mut self, time_unit: Option<TimeUnit>) -> &mut Self {
-        self.time_unit = time_unit;
+    fn time_unit(&mut self, time_unit: impl Into<Option<TimeUnit>>) -> &mut Self {
+        self.time_unit = time_unit.into();
         self
     }
 
@@ -1380,16 +1388,16 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
         self
     }
 
-    fn expected_updates(&mut self, expected_updates: Option<usize>) -> &mut Self {
+    fn expected_updates(&mut self, expected_updates: impl Into<Option<usize>>) -> &mut Self {
         self.inner
             .lock()
             .unwrap()
-            .expected_updates(expected_updates);
+            .expected_updates(expected_updates.into());
         self
     }
 
-    fn time_unit(&mut self, time_unit: Option<TimeUnit>) -> &mut Self {
-        self.inner.lock().unwrap().time_unit(time_unit);
+    fn time_unit(&mut self, time_unit: impl Into<Option<TimeUnit>>) -> &mut Self {
+        self.inner.lock().unwrap().time_unit(time_unit.into());
         self
     }
 
