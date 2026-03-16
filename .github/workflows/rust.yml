@@ -13,7 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
     - name: Check formatting
       run: cargo fmt -- --check
     - name: Build
@@ -21,4 +21,17 @@ jobs:
     - name: Run tests
       run: cargo test --verbose --target x86_64-unknown-linux-gnu
     - name: Run clippy
-      run: cargo clippy -- -Dclippy::all -Dclippy::cargo
+      run: cargo clippy -- -D warnings
+
+  build-i686:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install 32-bit support
+        run: sudo apt-get update && sudo apt-get install -y gcc-multilib
+      - name: Add i686 target
+        run: rustup target add i686-unknown-linux-gnu
+      - name: Build (32-bit)
+        run: cargo build --target i686-unknown-linux-gnu
+      - name: Test (32-bit)
+        run: cargo test --target i686-unknown-linux-gnu
