@@ -1,18 +1,32 @@
 # Change Log
 
-## [Unreleased]
+## [0.8.6] - 2026-04-03
 
-- `ProgressLog::expected_updates` now takes an `Into<Option<usize>>` instead of
-  an `Option<usize>`, so it can be called with a `usize` directly. The same
-  applies to `ProgressLog::time_unit`.
+### New
 
-## [0.8.4] - 2026-02-15
+- New `ProgressLog::log_level` setter to configure the log level
+  used for progress messages (default: `Info`).
+
+- `ProgressLog::expected_updates` now takes an
+  `impl Into<Option<usize>>` instead of an `Option<usize>`, so it
+  can be called with a `usize` directly. The same applies to
+  `ProgressLog::time_unit`.
+
+### Fixed
+
+- `ProgressLogger::clone` now preserves `log_target`.
+
+### Changed
+
+- Pinned `sysinfo` to 0.36.1, restoring Rust 1.85 compatibility.
+
+## [0.8.4] - 2026-02-15 [YANKED]
 
 ### Changed
 
 - Bumped Rust version to 1.88 as required by `sysinfo`.
 
-## [0.8.3] - 2026-02-15
+## [0.8.3] - 2026-02-15 [YANKED]
 
 ### Fixed
 

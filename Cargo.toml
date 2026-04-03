@@ -1,6 +1,6 @@
 [package]
 name = "dsi-progress-logger"
-version = "0.8.4"
+version = "0.8.6"
 edition = "2024"
 description = "A tunable time-based progress logger to log progress information about long-running activities"
 repository = "https://github.com/vigna/dsi-progress-logger-rs"
@@ -12,13 +12,13 @@ authors = [
 	"Tommaso Fontana <tommaso.fontana.96@gmail.com>",
 	"Sebastiano Vigna <sebastiano.vigna@unimi.it>",
 ]
-rust-version = "1.88"
+rust-version = "1.85"
 
 [dependencies]
 log = "0.4.17"
 num-format = "0.4.4"
 pluralizer = "0.5.0"
-sysinfo = { version = "0.38.2", default-features = false, features = ["system"] }
+sysinfo = { version = "0.36.1", default-features = false, features = ["system"] }
 
 [dev-dependencies]
 env_logger = "0.11.6"

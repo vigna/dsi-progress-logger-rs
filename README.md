@@ -2,7 +2,7 @@
 
 [![crates.io](https://img.shields.io/crates/v/dsi-progress-logger.svg)](https://crates.io/crates/dsi-progress-logger)
 [![docs.rs](https://docs.rs/dsi-progress-logger/badge.svg)](https://docs.rs/dsi-progress-logger)
-[![rustc](https://img.shields.io/badge/rustc-1.88+-red.svg)](https://rust-lang.github.io/rfcs/2495-min-rust-version.html)
+[![rustc](https://img.shields.io/badge/rustc-1.85+-red.svg)](https://rust-lang.github.io/rfcs/2495-min-rust-version.html)
 [![CI](https://github.com/vigna/dsi-progress-logger-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/vigna/dsi-progress-logger-rs/actions)
 ![license](https://img.shields.io/crates/l/dsi-progress-logger)
 [![downloads](https://img.shields.io/crates/d/dsi-progress-logger)](https://crates.io/crates/dsi-progress-logger)
@@ -12,7 +12,7 @@ activities.
 
 It is a port of the Java class [`it.unimi.dsi.util.ProgressLogger`] from the
 [DSI Utilities], with new features such as concurrent updates. Logging is based
-on the standard [`log`] crate at the `info` level.
+on the standard [`log`] crate, defaulting to the `info` level.
 
 There is a [`ProgressLog`] trait and a default implementation
 [`ProgressLogger`].

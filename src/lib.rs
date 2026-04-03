@@ -8,7 +8,7 @@
 
 #![doc = include_str!("../README.md")]
 
-use log::{debug, error, info, trace, warn};
+use log::{Level, debug, error, info, log, trace, warn};
 use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
 use std::fmt::{Arguments, Display, Formatter, Result};
@@ -115,7 +115,7 @@ pub trait ProgressLog {
     /// If not [`None`], the logger will display the percentage of completion
     /// and an estimate of the time to completion.
     ///
-    /// Note that you do not need to use a [`Some`](Option::Some)
+    /// Note that you do not need to use a [`Some`]
     /// wrapper around the argument, as the method will automatically convert it
     /// to an [`Option`] type.
     fn expected_updates(&mut self, expected_updates: impl Into<Option<usize>>) -> &mut Self;
@@ -127,7 +127,7 @@ pub trait ProgressLog {
     /// Moreover, large numbers will not be thousands separated. This behavior
     /// is useful when the output of the logger must be parsed.
     ///
-    /// Note that you do not need to use a [`Some`](Option::Some)
+    /// Note that you do not need to use a [`Some`]
     /// wrapper around the argument, as the method will automatically convert it
     /// to an [`Option`] type.
     fn time_unit(&mut self, time_unit: impl Into<Option<TimeUnit>>) -> &mut Self;
@@ -136,7 +136,7 @@ pub trait ProgressLog {
     /// log interval.
     fn local_speed(&mut self, local_speed: bool) -> &mut Self;
 
-    /// Set the [`log`] target.
+    /// Set the [`mod@log`] target.
     ///
     /// This should often be the path of the module logging progress, which is
     /// obtained with [`std::module_path!`].
@@ -167,6 +167,12 @@ pub trait ProgressLog {
     /// # }
     /// ```
     fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self;
+
+    /// Set the [`mod@log`] level used for progress messages.
+    ///
+    /// By default, progress messages are logged at the
+    /// [`Info`](`log::Level::Info`) level.
+    fn log_level(&mut self, log_level: Level) -> &mut Self;
 
     /// Add a value to the counter.
     ///
@@ -389,6 +395,11 @@ impl<P: ProgressLog> ProgressLog for &mut P {
         self
     }
 
+    fn log_level(&mut self, log_level: Level) -> &mut Self {
+        (**self).log_level(log_level);
+        self
+    }
+
     fn start(&mut self, msg: impl AsRef<str>) {
         (**self).start(msg);
     }
@@ -528,6 +539,13 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         self
     }
 
+    fn log_level(&mut self, log_level: Level) -> &mut Self {
+        if let Some(pl) = self {
+            pl.log_level(log_level);
+        }
+        self
+    }
+
     fn start(&mut self, msg: impl AsRef<str>) {
         if let Some(pl) = self {
             pl.start(msg);
@@ -634,7 +652,8 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 }
 
 /// An implementation of [`ProgressLog`] with output generated using the
-/// [`log`](https://docs.rs/log) crate at the `info` level.
+/// [`log`](https://docs.rs/log) crate at a configurable level (default:
+/// `info`).
 ///
 /// Instances can be created by using fluent setters, or by using the
 /// [`progress_logger`] macro.
@@ -735,10 +754,12 @@ pub struct ProgressLogger {
     time_unit: Option<TimeUnit>,
     /// Display additionally the speed achieved during the last log interval.
     local_speed: bool,
-    /// [`log`] target
+    /// [`mod@log`] target
     ///
     /// This is often the path of the module logging progress.
     log_target: String,
+    /// [`mod@log`] level for progress messages. Defaults to [`Level::Info`].
+    log_level: Level,
     /// When the logger was started.
     start_time: Option<Instant>,
     /// The last time we logged the activity (to compute speed).
@@ -775,6 +796,7 @@ impl Default for ProgressLogger {
                         .and_then(|s| s.to_owned().into_string().ok())
                 })
                 .unwrap_or_else(|| "main".to_string()),
+            log_level: Level::Info,
             start_time: None,
             last_log_time: Instant::now(),
             next_log_time: Instant::now(),
@@ -798,6 +820,8 @@ impl Clone for ProgressLogger {
             log_interval: self.log_interval,
             time_unit: self.time_unit,
             local_speed: self.local_speed,
+            log_level: self.log_level,
+            log_target: self.log_target.clone(),
             system: match self.system {
                 Some(_) => Some(System::new_with_specifics(
                     RefreshKind::nothing().with_memory(MemoryRefreshKind::nothing().with_ram()),
@@ -870,7 +894,7 @@ impl ProgressLog for ProgressLogger {
 
     fn log(&mut self, now: Instant) {
         self.refresh();
-        info!(target: &self.log_target, "{}", self);
+        log!(target: &self.log_target, self.log_level, "{}", self);
         self.last_count = self.count;
         self.last_log_time = now;
         self.next_log_time = now + self.log_interval;
@@ -932,6 +956,11 @@ impl ProgressLog for ProgressLogger {
         self
     }
 
+    fn log_level(&mut self, log_level: Level) -> &mut Self {
+        self.log_level = log_level;
+        self
+    }
+
     fn start(&mut self, msg: impl AsRef<str>) {
         let now = Instant::now();
         self.start_time = Some(now);
@@ -941,7 +970,7 @@ impl ProgressLog for ProgressLogger {
         self.last_log_time = now;
         self.next_log_time = now + self.log_interval;
         if !msg.as_ref().is_empty() {
-            info!(target: &self.log_target, "{}", msg.as_ref());
+            log!(target: &self.log_target, self.log_level, "{}", msg.as_ref());
         }
     }
 
@@ -989,9 +1018,9 @@ impl ProgressLog for ProgressLogger {
 
     fn done(&mut self) {
         self.stop();
-        info!(target: &self.log_target, "Completed.");
+        log!(target: &self.log_target, self.log_level, "Completed.");
         self.refresh();
-        info!(target: &self.log_target, "{}", self);
+        log!(target: &self.log_target, self.log_level, "{}", self);
     }
 
     fn done_with_count(&mut self, count: usize) {
@@ -1411,6 +1440,11 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
         self
     }
 
+    fn log_level(&mut self, log_level: Level) -> &mut Self {
+        self.inner.lock().unwrap().log_level(log_level);
+        self
+    }
+
     fn start(&mut self, msg: impl AsRef<str>) {
         self.inner.lock().unwrap().start(msg);
         self.local_count = 0;
@@ -1554,6 +1588,8 @@ macro_rules! no_logging {
 }
 
 pub mod prelude {
+    pub use log::Level;
+
     pub use super::{
         ConcurrentProgressLog, ConcurrentWrapper, ProgressLog, ProgressLogger, TimeUnit,
         concurrent_progress_logger, no_logging, progress_logger,
