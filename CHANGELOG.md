@@ -1,5 +1,17 @@
 # Change Log
 
+## [0.8.7] - 2026-04-29
+
+### New
+
+- New `push_log_target`/`pop_log_target` methods that make it easier
+  to log subtask.
+
+### Fixed
+
+- `ConcurrentProgressLogger` was not flushing the internal counter
+  before `stop`/`done`.
+
 ## [0.8.6] - 2026-04-03
 
 ### New

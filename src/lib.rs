@@ -76,19 +76,19 @@ pub trait ProgressLog {
     /// The type returned by [`concurrent`](ProgressLog::concurrent).
     type Concurrent: ConcurrentProgressLog;
 
-    /// Force a log of `self` assuming `now` is the current time.
+    /// Forces a log of `self` assuming `now` is the current time.
     ///
     /// This is a low-level method that should not be called directly.
     fn log(&mut self, now: Instant);
 
-    /// Log `self` if it is time to log.
+    /// Logs `self` if it is time to log.
     ///
     /// This is a low-level method that should not be called directly.
     fn log_if(&mut self, now: Instant);
 
-    /// Set the display of memory information.
+    /// Sets the display of memory information.
     ///
-    /// Memory information include:
+    /// Memory information includes:
     /// - the [resident-set size](sysinfo::Process::memory) of the process that
     ///   created the logger;
     /// - the [virtual-memory size](sysinfo::Process::virtual_memory) of the
@@ -104,39 +104,39 @@ pub trait ProgressLog {
     /// deadlock](https://github.com/rayon-rs/rayon/issues/592) .
     fn display_memory(&mut self, display_memory: bool) -> &mut Self;
 
-    /// Set the name of an item.
+    /// Sets the name of an item.
     fn item_name(&mut self, item_name: impl AsRef<str>) -> &mut Self;
 
-    /// Set the log interval.
+    /// Sets the log interval.
     fn log_interval(&mut self, log_interval: Duration) -> &mut Self;
 
-    /// Set the expected number of updates.
+    /// Sets the expected number of updates.
     ///
     /// If not [`None`], the logger will display the percentage of completion
     /// and an estimate of the time to completion.
     ///
-    /// Note that you do not need to use a [`Some`]
+    /// Note that there is no need to use a [`Some`]
     /// wrapper around the argument, as the method will automatically convert it
     /// to an [`Option`] type.
     fn expected_updates(&mut self, expected_updates: impl Into<Option<usize>>) -> &mut Self;
 
-    /// Set the time unit to use for speed.
+    /// Sets the time unit to use for speed.
     ///
     /// If not [`None`], the logger will always display the speed in this unit
     /// instead of making a choice of readable unit based on the elapsed time.
     /// Moreover, large numbers will not be thousands separated. This behavior
     /// is useful when the output of the logger must be parsed.
     ///
-    /// Note that you do not need to use a [`Some`]
+    /// Note that there is no need to use a [`Some`]
     /// wrapper around the argument, as the method will automatically convert it
     /// to an [`Option`] type.
     fn time_unit(&mut self, time_unit: impl Into<Option<TimeUnit>>) -> &mut Self;
 
-    /// Set whether to display additionally the speed achieved during the last
+    /// Sets whether to display additionally the speed achieved during the last
     /// log interval.
     fn local_speed(&mut self, local_speed: bool) -> &mut Self;
 
-    /// Set the [`mod@log`] target.
+    /// Sets the [`mod@log`] target.
     ///
     /// This should often be the path of the module logging progress, which is
     /// obtained with [`std::module_path!`].
@@ -144,15 +144,15 @@ pub trait ProgressLog {
     /// Note that the macro [`progress_logger!`] sets this field automatically
     /// to [`std::module_path!`].
     ///
+    /// Calling this method clears any suffixes previously pushed with
+    /// [`push_log_target`](ProgressLog::push_log_target).
+    ///
     /// # Examples
     ///
     /// ```rust
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// use dsi_progress_logger::prelude::*;
-    ///
-    ///    env_logger::builder()
-    ///        .filter_level(log::LevelFilter::Info)
-    ///        .try_init()?;
+    /// # use dsi_progress_logger::prelude::*;
+    /// env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
     ///
     /// let mut pl = ProgressLogger::default();
     /// pl.item_name("pumpkin");
@@ -163,97 +163,143 @@ pub trait ProgressLog {
     ///    pl.update();
     /// }
     /// pl.done();
-    /// #     Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self;
 
-    /// Set the [`mod@log`] level used for progress messages.
+    /// Pushes a suffix to the [`mod@log`] target.
+    ///
+    /// The suffix is appended to the current log target as-is, with no
+    /// separator. The caller controls the format (e.g., `" > subtask"` or
+    /// `"::phase2"`).
+    ///
+    /// Each push records the current length of the log target so that
+    /// [`pop_log_target`](ProgressLog::pop_log_target) can restore it.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # use dsi_progress_logger::prelude::*;
+    /// env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
+    ///
+    /// let mut pl = ProgressLogger::default();
+    /// pl.item_name("pumpkin");
+    /// pl.log_target(std::module_path!());
+    /// pl.start("Smashing pumpkins from a module...");
+    /// for _ in 0..100 {
+    ///    // do something on each pumpkin
+    ///    pl.update();
+    /// }
+    /// pl.done();
+    ///
+    /// // Entering subtask
+    /// pl.push_log_target(" > smoothing");
+    /// pl.start("Smashing pumpkins...");
+    /// for _ in 0..100 {
+    ///    // do something on each pumpkin
+    ///    pl.update();
+    /// }
+    /// pl.done();
+    /// pl.pop_log_target();
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn push_log_target(&mut self, suffix: impl AsRef<str>) -> &mut Self;
+
+    /// Pops the last suffix pushed with
+    /// [`push_log_target`](ProgressLog::push_log_target).
+    ///
+    /// If no suffix has been pushed, this method is a no-op.
+    fn pop_log_target(&mut self) -> &mut Self;
+
+    /// Sets the [`mod@log`] level used for progress messages.
     ///
     /// By default, progress messages are logged at the
     /// [`Info`](`log::Level::Info`) level.
     fn log_level(&mut self, log_level: Level) -> &mut Self;
 
-    /// Add a value to the counter.
+    /// Adds a value to the counter.
     ///
     /// This method is mainly useful for wrappers or to implement a custom
     /// update strategy.
     fn add_to_count(&mut self, count: usize);
 
-    /// Start the logger, displaying the given message.
+    /// Starts the logger, displaying the given message.
     ///
-    /// You can pass the empty string to display nothing.
+    /// An empty string can be passed to display nothing.
     fn start(&mut self, msg: impl AsRef<str>);
 
-    /// Increase the count and check whether it is time to log.
+    /// Increases the count and checks whether it is time to log.
     fn update(&mut self);
 
-    /// Set the count and check whether it is time to log.
+    /// Sets the count and checks whether it is time to log.
     fn update_with_count(&mut self, count: usize) {
         self.update_with_count_and_time(count, Instant::now());
     }
 
-    /// Set the count and check whether it is time to log, given the current
+    /// Sets the count and checks whether it is time to log, given the current
     /// time.
     ///
     /// This method is mainly useful for wrappers that want to avoid unnecessary
     /// calls to [`Instant::now`].
     fn update_with_count_and_time(&mut self, count: usize, now: Instant);
 
-    /// Increase the count but checks whether it is time to log only after an
+    /// Increases the count but checks whether it is time to log only after an
     /// implementation-defined number of calls.
     ///
     /// Useful for very short activities with respect to which checking the
     /// time is expensive.
     fn light_update(&mut self);
 
-    /// Increase the count and forces a log.
+    /// Increases the count and forces a log.
     fn update_and_display(&mut self);
 
-    /// Stop the logger, fixing the final time.
+    /// Stops the logger, fixing the final time.
     fn stop(&mut self);
 
-    /// Stop the logger, print `Completed.`, and display the final stats. The
-    /// number of expected updates will be cleared.
+    /// Stops the logger, prints `Completed.`, and displays the final stats.
+    /// The number of expected updates will be cleared.
     fn done(&mut self);
 
-    /// Stop the logger, sets the count, prints `Completed.`, and displays the
+    /// Stops the logger, sets the count, prints `Completed.`, and displays the
     /// final stats. The number of expected updates will be cleared.
     ///
     /// This method is particularly useful in two circumstances:
-    /// * you have updated the logger with some approximate values (e.g., in a
-    ///   multicore computation) but before printing the final stats you want
-    ///   the internal counter to contain an exact value;
-    /// * you have used the logger as a handy timer, calling just
+    /// * the logger has been updated with some approximate values (e.g., in a
+    ///   multicore computation) but before printing the final stats the
+    ///   internal counter should contain an exact value;
+    /// * the logger has been used as a handy timer, calling just
     ///   [`start`](ProgressLog::start) and this method.
     fn done_with_count(&mut self, count: usize);
 
-    /// Return the elapsed time since the logger was started, or `None` if the
+    /// Returns the elapsed time since the logger was started, or `None` if the
     /// logger has not been started.
     fn elapsed(&self) -> Option<Duration>;
 
-    /// Return the last count the logger has been set to.
+    /// Returns the last count the logger has been set to.
     ///
-    /// Note that you can call this method even after the logger has been
+    /// Note that this method can be called even after the logger has been
     /// [stopped](ProgressLog::stop).
     fn count(&self) -> usize;
 
-    /// Refresh memory information, if previously requested with
-    /// [`display_memory`](#method.display_memory). You do not need to call this
-    /// method unless you display the logger manually.
+    /// Refreshes memory information, if previously requested with
+    /// [`display_memory`](#method.display_memory). There is no need to call
+    /// this method unless the logger is displayed manually.
     fn refresh(&mut self);
 
-    /// Output the given message at the [trace](`log::Level::Trace`) level.
+    /// Outputs the given message at the [trace](`log::Level::Trace`) level.
     ///
     /// See [`info`](ProgressLog::info) for an example.
     fn trace(&self, args: Arguments<'_>);
 
-    /// Output the given message at the [debug](`log::Level::Debug`) level.
+    /// Outputs the given message at the [debug](`log::Level::Debug`) level.
     ///
     /// See [`info`](ProgressLog::info) for an example.
     fn debug(&self, args: Arguments<'_>);
 
-    /// Output the given message at the [info](`log::Level::Info`) level.
+    /// Outputs the given message at the [info](`log::Level::Info`) level.
     ///
     /// For maximum flexibility, this method takes as argument the result of a
     /// [`std::format_args!`] macro. Note that there will be no output if the
@@ -263,35 +309,32 @@ pub trait ProgressLog {
     ///
     /// ```rust
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// use dsi_progress_logger::*;
-    ///
-    /// env_logger::builder()
-    ///     .filter_level(log::LevelFilter::Info)
-    ///     .try_init()?;
+    /// # use dsi_progress_logger::*;
+    /// env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
     ///
     /// let logger_name = "my_logger";
     /// let mut pl = progress_logger![];
     /// pl.info(format_args!("My logger named {}", logger_name));
-    /// #     Ok(())
+    /// # Ok(())
     /// # }
     /// ```
     fn info(&self, args: Arguments<'_>);
 
-    /// Output the given message at the [warn](`log::Level::Warn`) level.
+    /// Outputs the given message at the [warn](`log::Level::Warn`) level.
     ///
     /// See [`info`](ProgressLog::info) for an example.
     fn warn(&self, args: Arguments<'_>);
 
-    /// Output the given message at the [error](`log::Level::Error`) level.
+    /// Outputs the given message at the [error](`log::Level::Error`) level.
     ///
     /// See [`info`](ProgressLog::info) for an example.
     fn error(&self, args: Arguments<'_>);
 
-    /// Return a concurrent copy of the logger.
+    /// Returns a concurrent copy of the logger.
     ///
     /// Some methods require both sequential and concurrent logging. To keep
-    /// optional logging efficient, we suggest in this cases to use `&mut impl
-    /// ProgressLog` to pass a logger as an argument, and then creating a
+    /// optional logging efficient, it is suggested to use `&mut impl
+    /// ProgressLog` to pass a logger as an argument, and then create a
     /// concurrent copy of the logger with this method. If the original logger
     /// is `None`, the concurrent copy will be `None` as well.
     ///
@@ -299,7 +342,7 @@ pub trait ProgressLog {
     /// of the original logger.
     ///
     /// Concurrent logger implementations can just return a duplicate of
-    /// themselves. [`dup`](ConcurrentProgressLog::dup).
+    /// themselves via [`dup`](ConcurrentProgressLog::dup).
     fn concurrent(&self) -> Self::Concurrent;
 }
 
@@ -336,9 +379,9 @@ pub trait ConcurrentProgressLog: ProgressLog + Sync + Send + Clone {
     /// The type returned by [`dup`](ConcurrentProgressLog::dup).
     type Duplicated: ConcurrentProgressLog;
 
-    /// Duplicate the concurrent progress logger, obtaining a new one.
+    /// Duplicates the concurrent progress logger, obtaining a new one.
     ///
-    /// Note that the this method has the same semantics of [`ProgressLogger`'s
+    /// Note that this method has the same semantics of [`ProgressLogger`'s
     /// `Clone` implementation](ProgressLogger#impl-Clone-for-ProgressLogger),
     /// but in a [`ConcurrentProgressLog`] by contract [cloning must generate
     /// copies with the same underlying logger](ConcurrentProgressLog).
@@ -392,6 +435,16 @@ impl<P: ProgressLog> ProgressLog for &mut P {
 
     fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self {
         (**self).log_target(target);
+        self
+    }
+
+    fn push_log_target(&mut self, suffix: impl AsRef<str>) -> &mut Self {
+        (**self).push_log_target(suffix);
+        self
+    }
+
+    fn pop_log_target(&mut self) -> &mut Self {
+        (**self).pop_log_target();
         self
     }
 
@@ -539,6 +592,20 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         self
     }
 
+    fn push_log_target(&mut self, suffix: impl AsRef<str>) -> &mut Self {
+        if let Some(pl) = self {
+            pl.push_log_target(suffix);
+        }
+        self
+    }
+
+    fn pop_log_target(&mut self) -> &mut Self {
+        if let Some(pl) = self {
+            pl.pop_log_target();
+        }
+        self
+    }
+
     fn log_level(&mut self, log_level: Level) -> &mut Self {
         if let Some(pl) = self {
             pl.log_level(log_level);
@@ -669,8 +736,7 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 ///
 /// ```rust
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use dsi_progress_logger::prelude::*;
-///
+/// # use dsi_progress_logger::prelude::*;
 /// env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
 ///
 /// let mut pl = ProgressLogger::default();
@@ -681,7 +747,7 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 ///    pl.update();
 /// }
 /// pl.done();
-/// #     Ok(())
+/// # Ok(())
 /// # }
 /// ```
 ///
@@ -692,8 +758,7 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 ///
 /// ```rust
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use dsi_progress_logger::prelude::*;
-///
+/// # use dsi_progress_logger::prelude::*;
 /// env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
 ///
 /// let mut pl = progress_logger![item_name="pumpkin"];
@@ -703,7 +768,7 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 ///    pl.update();
 /// }
 /// pl.done();
-/// #     Ok(())
+/// # Ok(())
 /// # }
 /// ```
 ///
@@ -711,8 +776,7 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 ///
 /// ```rust
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use dsi_progress_logger::prelude::*;
-///
+/// # use dsi_progress_logger::prelude::*;
 /// env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
 ///
 /// let mut pl = progress_logger![item_name="pumpkin"];
@@ -721,7 +785,7 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 ///    // do something on each pumpkin
 /// }
 /// pl.done_with_count(100);
-/// #     Ok(())
+/// # Ok(())
 /// # }
 /// ```
 ///
@@ -729,12 +793,11 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 ///
 /// ```rust
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// use dsi_progress_logger::prelude::*;
-///
+/// # use dsi_progress_logger::prelude::*;
 /// env_logger::builder().filter_level(log::LevelFilter::Info).try_init()?;
 ///
 /// let mut pl = progress_logger![display_memory=true];
-/// #     Ok(())
+/// # Ok(())
 /// # }
 /// ```
 pub struct ProgressLogger {
@@ -758,6 +821,8 @@ pub struct ProgressLogger {
     ///
     /// This is often the path of the module logging progress.
     log_target: String,
+    /// Stack of cut positions for [`push_log_target`](ProgressLog::push_log_target)/[`pop_log_target`](ProgressLog::pop_log_target).
+    log_target_cut_positions: Vec<usize>,
     /// [`mod@log`] level for progress messages. Defaults to [`Level::Info`].
     log_level: Level,
     /// When the logger was started.
@@ -779,7 +844,7 @@ pub struct ProgressLogger {
 }
 
 impl Default for ProgressLogger {
-    /// Create a default [`ProgressLogger`] with a log interval of 10 seconds and
+    /// Creates a default [`ProgressLogger`] with a log interval of 10 seconds and
     /// item name set to “item”.
     fn default() -> Self {
         Self {
@@ -796,6 +861,7 @@ impl Default for ProgressLogger {
                         .and_then(|s| s.to_owned().into_string().ok())
                 })
                 .unwrap_or_else(|| "main".to_string()),
+            log_target_cut_positions: Vec::new(),
             log_level: Level::Info,
             start_time: None,
             last_log_time: Instant::now(),
@@ -810,7 +876,7 @@ impl Default for ProgressLogger {
 }
 
 impl Clone for ProgressLogger {
-    /// Clone the logger, returning a logger with the same setup but with all the
+    /// Clones the logger, returning a logger with the same setup but with all the
     /// counters reset.
     #[allow(clippy::manual_map)]
     fn clone(&self) -> Self {
@@ -822,6 +888,7 @@ impl Clone for ProgressLogger {
             local_speed: self.local_speed,
             log_level: self.log_level,
             log_target: self.log_target.clone(),
+            log_target_cut_positions: self.log_target_cut_positions.clone(),
             system: match self.system {
                 Some(_) => Some(System::new_with_specifics(
                     RefreshKind::nothing().with_memory(MemoryRefreshKind::nothing().with_ram()),
@@ -838,11 +905,9 @@ impl Clone for ProgressLogger {
 ///
 /// # Examples
 ///
-///
 /// ```rust
-/// use dsi_progress_logger::prelude::*;
-///
-/// let mut pl = progress_logger![item_name="pumpkin", display_memory=true];
+/// # use dsi_progress_logger::prelude::*;
+/// let mut pl = progress_logger![item_name = "pumpkin", display_memory = true];
 /// ```
 #[macro_export]
 macro_rules! progress_logger {
@@ -953,6 +1018,20 @@ impl ProgressLog for ProgressLogger {
 
     fn log_target(&mut self, target: impl AsRef<str>) -> &mut Self {
         self.log_target = target.as_ref().into();
+        self.log_target_cut_positions.clear();
+        self
+    }
+
+    fn push_log_target(&mut self, suffix: impl AsRef<str>) -> &mut Self {
+        self.log_target_cut_positions.push(self.log_target.len());
+        self.log_target.push_str(suffix.as_ref());
+        self
+    }
+
+    fn pop_log_target(&mut self) -> &mut Self {
+        if let Some(pos) = self.log_target_cut_positions.pop() {
+            self.log_target.truncate(pos);
+        }
         self
     }
 
@@ -995,7 +1074,7 @@ impl ProgressLog for ProgressLogger {
     }
 
     /// Increases the count and, once every
-    /// [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, check
+    /// [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, checks
     /// whether it is time to log.
     #[inline(always)]
     fn light_update(&mut self) {
@@ -1099,7 +1178,7 @@ impl Display for ProgressLogger {
                 let elapsed = now - start_time;
 
                 f.write_fmt(format_args!(
-                    "{} {}, {}, ",
+                    "{} {}, {}",
                     count_fmtd,
                     if self.count == 1 {
                         &self.item_name
@@ -1109,29 +1188,34 @@ impl Display for ProgressLogger {
                     TimeUnit::pretty_print(elapsed.as_millis()),
                 ))?;
 
-                let seconds_per_item = elapsed.as_secs_f64() / self.count as f64;
-                self.fmt_timing_speed(f, seconds_per_item)?;
-
-                if let Some(expected_updates) = self.expected_updates {
-                    let millis_to_end: u128 = (expected_updates.saturating_sub(self.count) as u128
-                        * elapsed.as_millis())
-                        / (self.count as u128 + 1);
-                    f.write_fmt(format_args!(
-                        "; {:.2}% done, {} to end",
-                        100.0 * self.count as f64 / expected_updates as f64,
-                        TimeUnit::pretty_print(millis_to_end)
-                    ))?;
-                }
-
-                if self.local_speed && self.stop_time.is_none() {
-                    f.write_fmt(format_args!(" ["))?;
-
-                    let elapsed = now - self.last_log_time;
-                    let seconds_per_item =
-                        elapsed.as_secs_f64() / (self.count - self.last_count) as f64;
+                if self.count != 0 {
+                    let seconds_per_item = elapsed.as_secs_f64() / self.count as f64;
+                    f.write_fmt(format_args!(", "))?;
                     self.fmt_timing_speed(f, seconds_per_item)?;
 
-                    f.write_fmt(format_args!("]"))?;
+                    if let Some(expected_updates) = self.expected_updates {
+                        let millis_to_end: u128 = (expected_updates.saturating_sub(self.count)
+                            as u128
+                            * elapsed.as_millis())
+                            / (self.count as u128 + 1);
+                        f.write_fmt(format_args!(
+                            "; {:.2}% done, {} to end",
+                            100.0 * self.count as f64 / expected_updates as f64,
+                            TimeUnit::pretty_print(millis_to_end)
+                        ))?;
+                    }
+
+                    if self.local_speed && self.stop_time.is_none() && self.count != self.last_count
+                    {
+                        f.write_fmt(format_args!(" ["))?;
+
+                        let elapsed = now - self.last_log_time;
+                        let seconds_per_item =
+                            elapsed.as_secs_f64() / (self.count - self.last_count) as f64;
+                        self.fmt_timing_speed(f, seconds_per_item)?;
+
+                        f.write_fmt(format_args!("]"))?;
+                    }
                 }
             }
 
@@ -1181,9 +1265,8 @@ impl Display for ProgressLogger {
 /// In this example, we manually spawn processes:
 ///
 /// ```rust
-/// use dsi_progress_logger::prelude::*;
-/// use std::thread;
-///
+/// # use dsi_progress_logger::prelude::*;
+/// # use std::thread;
 /// let mut cpl = concurrent_progress_logger![item_name = "pumpkin"];
 /// cpl.start("Smashing pumpkins (using many threads)...");
 ///
@@ -1209,9 +1292,8 @@ impl Display for ProgressLogger {
 /// [`map_with`](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.map_with):
 ///
 /// ```rust
-/// use dsi_progress_logger::prelude::*;
-/// use rayon::prelude::*;
-///
+/// # use dsi_progress_logger::prelude::*;
+/// # use rayon::prelude::*;
 /// let mut cpl = concurrent_progress_logger![item_name = "pumpkin"];
 /// cpl.start("Smashing pumpkins (using many threads)...");
 ///
@@ -1242,7 +1324,7 @@ pub struct ConcurrentWrapper<P: ProgressLog = ProgressLogger> {
 }
 
 impl Default for ConcurrentWrapper {
-    /// Create a new [`ConcurrentWrapper`] based on a default
+    /// Creates a new [`ConcurrentWrapper`] based on a default
     /// [`ProgressLogger`], with a threshold of
     /// [`DEFAULT_THRESHOLD`](Self::DEFAULT_THRESHOLD).
     fn default() -> Self {
@@ -1255,7 +1337,7 @@ impl Default for ConcurrentWrapper {
 }
 
 impl<P: ProgressLog + Clone> Clone for ConcurrentWrapper<P> {
-    /// Clone the concurrent wrapper, obtaining a new one with the same
+    /// Clones the concurrent wrapper, obtaining a new one with the same
     /// threshold, with a local count of zero, and with the same inner
     /// [`ProgressLog`].
     fn clone(&self) -> Self {
@@ -1274,9 +1356,8 @@ impl<P: ProgressLog + Clone> Clone for ConcurrentWrapper<P> {
 /// # Examples
 ///
 /// ```rust
-/// use dsi_progress_logger::prelude::*;
-///
-/// let mut pl = concurrent_progress_logger![item_name="pumpkin", display_memory=true];
+/// # use dsi_progress_logger::prelude::*;
+/// let mut pl = concurrent_progress_logger![item_name = "pumpkin", display_memory = true];
 /// ```
 #[macro_export]
 macro_rules! concurrent_progress_logger {
@@ -1293,14 +1374,14 @@ macro_rules! concurrent_progress_logger {
 }
 
 impl ConcurrentWrapper {
-    /// Create a new [`ConcurrentWrapper`] based on a default
+    /// Creates a new [`ConcurrentWrapper`] based on a default
     /// [`ProgressLogger`], using the [default
     /// threshold](Self::DEFAULT_THRESHOLD).
     pub fn new() -> Self {
         Self::with_threshold(Self::DEFAULT_THRESHOLD)
     }
 
-    /// Create a new [`ConcurrentWrapper`] wrapping a default
+    /// Creates a new [`ConcurrentWrapper`] wrapping a default
     /// [`ProgressLogger`], using the given threshold.
     pub fn with_threshold(threshold: u32) -> Self {
         Self {
@@ -1324,7 +1405,7 @@ impl<P: ProgressLog> ConcurrentWrapper<P> {
     /// mechanism.
     pub const LIGHT_UPDATE_MASK: u32 = (1 << 10) - 1;
 
-    /// Set the threshold for updating the underlying logger.
+    /// Sets the threshold for updating the underlying logger.
     ///
     /// Note that concurrent loggers with the same underlying logger
     /// have independent thresholds.
@@ -1333,7 +1414,7 @@ impl<P: ProgressLog> ConcurrentWrapper<P> {
         self
     }
 
-    /// Wrap a given [`ProgressLog`] in a [`ConcurrentWrapper`]
+    /// Wraps a given [`ProgressLog`] in a [`ConcurrentWrapper`]
     /// using the [default threshold](Self::DEFAULT_THRESHOLD).
     pub fn wrap(inner: P) -> Self {
         Self {
@@ -1343,7 +1424,7 @@ impl<P: ProgressLog> ConcurrentWrapper<P> {
         }
     }
 
-    /// Wrap a given [`ProgressLog`] in a [`ConcurrentWrapper`] using a
+    /// Wraps a given [`ProgressLog`] in a [`ConcurrentWrapper`] using a
     /// given threshold.
     pub fn wrap_with_threshold(inner: P, threshold: u32) -> Self {
         Self {
@@ -1353,7 +1434,7 @@ impl<P: ProgressLog> ConcurrentWrapper<P> {
         }
     }
 
-    /// Force an update of the underlying logger with the current local count.
+    /// Forces an update of the underlying logger with the current local count.
     pub fn flush(&mut self) {
         self.inner
             .lock()
@@ -1440,6 +1521,16 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
         self
     }
 
+    fn push_log_target(&mut self, suffix: impl AsRef<str>) -> &mut Self {
+        self.inner.lock().unwrap().push_log_target(suffix);
+        self
+    }
+
+    fn pop_log_target(&mut self) -> &mut Self {
+        self.inner.lock().unwrap().pop_log_target();
+        self
+    }
+
     fn log_level(&mut self, log_level: Level) -> &mut Self {
         self.inner.lock().unwrap().log_level(log_level);
         self
@@ -1516,14 +1607,17 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
     }
 
     fn stop(&mut self) {
+        self.flush();
         self.inner.lock().unwrap().stop();
     }
 
     fn done(&mut self) {
+        self.flush();
         self.inner.lock().unwrap().done();
     }
 
     fn done_with_count(&mut self, count: usize) {
+        self.flush();
         self.inner.lock().unwrap().done_with_count(count);
     }
 

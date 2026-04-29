@@ -6,7 +6,6 @@
  */
 
 use dsi_progress_logger::*;
-use log::info;
 use std::thread;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,8 +24,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     pl.done();
 
-    info!("");
-
     // Macro initialization
     let mut pl = progress_logger![
         display_memory = true,
@@ -36,7 +33,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     pl.start("Smashing pumpkins...");
-    for _ in 0..300 {
+    for _ in 0..100 {
+        thread::sleep(std::time::Duration::from_millis(100));
+        pl.update();
+    }
+    pl.done();
+
+    pl.push_log_target(" > smoothing");
+    pl.start("Smashing pumpkins...");
+    for _ in 0..100 {
+        thread::sleep(std::time::Duration::from_millis(100));
+        pl.update();
+    }
+    pl.done();
+    pl.pop_log_target();
+
+    pl.info(format_args!("Eating pumpkin purée..."));
+    for _ in 0..100 {
         thread::sleep(std::time::Duration::from_millis(100));
         pl.update();
     }

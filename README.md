@@ -81,4 +81,3 @@ MUR can be held responsible for them.
 [DSI Utilities]: https://dsiutils.di.unimi.it/
 [`log`]: https://docs.rs/log
 [`no_logging!`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/macro.no_logging.html
-[`ProgressLog::concurrent`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#tymethod.concurrent
