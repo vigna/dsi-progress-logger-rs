@@ -48,7 +48,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     pl.done();
     pl.pop_log_target();
 
-    pl.info(format_args!("Eating pumpkin purée..."));
+    pl.info(format_args!("Time for dessert!"));
+
+    pl.start("Eating pumpkin purée...");
     for _ in 0..100 {
         thread::sleep(std::time::Duration::from_millis(100));
         pl.update();

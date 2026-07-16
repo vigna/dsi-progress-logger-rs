@@ -49,7 +49,7 @@ pub use utils::*;
 /// your compilation unit depends on
 /// [`sysinfo`](https://crates.io/crates/sysinfo)'s (default) `multithread`
 /// feature, as [this can lead to a
-/// deadlock](https://github.com/rayon-rs/rayon/issues/592) .
+/// deadlock](https://github.com/rayon-rs/rayon/issues/592).
 ///
 ///
 /// At any time, displaying the progress logger will give you time information
@@ -62,8 +62,8 @@ pub use utils::*;
 /// [`done`](ProgressLog::done) will stop the logger, print `Completed.`, and
 /// display the final stats.
 ///
-/// After you finish a run of the progress logger, can call
-/// [`start`](ProgressLog::start) again measure another activity.
+/// After you finish a run of the progress logger, you can call
+/// [`start`](ProgressLog::start) again to measure another activity.
 ///
 /// As explained in the [crate documentation](crate), we suggest using `&mut
 /// impl ProgressLog` to pass a logger as an argument, to be able to use
@@ -101,7 +101,7 @@ pub trait ProgressLog {
     /// environment if another crate in your compilation unit depends on
     /// [`sysinfo`](https://crates.io/crates/sysinfo)'s (default) `multithread`
     /// feature, as [this can lead to a
-    /// deadlock](https://github.com/rayon-rs/rayon/issues/592) .
+    /// deadlock](https://github.com/rayon-rs/rayon/issues/592).
     fn display_memory(&mut self, display_memory: bool) -> &mut Self;
 
     /// Sets the name of an item.
@@ -285,8 +285,8 @@ pub trait ProgressLog {
     fn count(&self) -> usize;
 
     /// Refreshes memory information, if previously requested with
-    /// [`display_memory`](#method.display_memory). There is no need to call
-    /// this method unless the logger is displayed manually.
+    /// [`display_memory`](ProgressLog::display_memory). There is no need to
+    /// call this method unless the logger is displayed manually.
     fn refresh(&mut self);
 
     /// Outputs the given message at the [trace](`log::Level::Trace`) level.
@@ -362,7 +362,7 @@ pub trait ProgressLog {
 /// in your compilation unit depends on
 /// [`sysinfo`](https://crates.io/crates/sysinfo)'s (default) `multithread`
 /// feature, as [this can lead to a
-/// deadlock](https://github.com/rayon-rs/rayon/issues/592) .
+/// deadlock](https://github.com/rayon-rs/rayon/issues/592).
 ///
 /// Note that [`ProgressLogger`]'s [`Clone`
 /// implementation](ProgressLogger#impl-Clone-for-ProgressLogger) has a
@@ -459,6 +459,10 @@ impl<P: ProgressLog> ProgressLog for &mut P {
 
     fn update(&mut self) {
         (**self).update();
+    }
+
+    fn update_with_count(&mut self, count: usize) {
+        (**self).update_with_count(count);
     }
 
     fn update_with_count_and_time(&mut self, count: usize, now: Instant) {
@@ -625,6 +629,12 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         }
     }
 
+    fn update_with_count(&mut self, count: usize) {
+        if let Some(pl) = self {
+            pl.update_with_count(count);
+        }
+    }
+
     fn update_with_count_and_time(&mut self, count: usize, now: Instant) {
         if let Some(pl) = self {
             pl.update_with_count_and_time(count, now);
@@ -726,9 +736,9 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 /// [`progress_logger`] macro.
 ///
 /// You can [clone](#impl-Clone-for-ProgressLogger) a logger to create a new one
-/// with the same setup but with all the counters reset. This behavior is useful
-/// when you want to configure a logger and then use its configuration for other
-/// loggers.
+/// with the same setup but with all the counters reset and the expected number
+/// of updates cleared. This behavior is useful when you want to configure a
+/// logger and then use its configuration for other loggers.
 ///
 /// # Examples
 ///
@@ -876,8 +886,15 @@ impl Default for ProgressLogger {
 }
 
 impl Clone for ProgressLogger {
-    /// Clones the logger, returning a logger with the same setup but with all the
-    /// counters reset.
+    /// Clones the logger, returning a logger with the same setup but with all
+    /// the counters reset and the expected number of updates cleared.
+    ///
+    /// The expected number of updates is cleared, as in
+    /// [`stop`](ProgressLog::stop), because it rarely carries over to another
+    /// activity; if needed, it can be set again with
+    /// [`expected_updates`](ProgressLog::expected_updates). Note that this
+    /// behavior extends to [`ProgressLog::concurrent`] and
+    /// [`ConcurrentProgressLog::dup`], which clone the underlying logger.
     #[allow(clippy::manual_map)]
     fn clone(&self) -> Self {
         Self {
@@ -1055,6 +1072,7 @@ impl ProgressLog for ProgressLogger {
 
     fn refresh(&mut self) {
         if let Some(system) = &mut self.system {
+            system.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
             system.refresh_processes_specifics(
                 ProcessesToUpdate::Some(&[self.pid]),
                 false,
@@ -1074,8 +1092,8 @@ impl ProgressLog for ProgressLogger {
     }
 
     /// Increases the count and, once every
-    /// [`LIGHT_UPDATE_MASK`](#fields.LIGHT_UPDATE_MASK) + 1 calls, checks
-    /// whether it is time to log.
+    /// [`LIGHT_UPDATE_MASK`](ProgressLogger::LIGHT_UPDATE_MASK) + 1 calls,
+    /// checks whether it is time to log.
     #[inline(always)]
     fn light_update(&mut self) {
         self.count += 1;
@@ -1255,7 +1273,8 @@ impl Display for ProgressLogger {
 /// threshold is set at creation using the methods
 /// [`with_threshold`](Self::with_threshold) and
 /// [`wrap_with_threshold`](Self::wrap_with_threshold), or by calling the method
-/// [`threshold`](Self::threshold).
+/// [`threshold`](Self::threshold); it is always clamped to
+/// [`MAX_THRESHOLD`](Self::MAX_THRESHOLD).
 ///
 /// The method [`light_update`](ProgressLog::light_update), as in the case of
 /// [`ProgressLogger`], further delays updates using an even faster check.
@@ -1383,11 +1402,13 @@ impl ConcurrentWrapper {
 
     /// Creates a new [`ConcurrentWrapper`] wrapping a default
     /// [`ProgressLogger`], using the given threshold.
+    ///
+    /// The threshold is clamped to [`MAX_THRESHOLD`](Self::MAX_THRESHOLD).
     pub fn with_threshold(threshold: u32) -> Self {
         Self {
             inner: Arc::new(Mutex::new(ProgressLogger::default())),
             local_count: 0,
-            threshold,
+            threshold: threshold.min(Self::MAX_THRESHOLD),
         }
     }
 }
@@ -1398,19 +1419,31 @@ impl<P: ProgressLog> ConcurrentWrapper<P> {
 
     /// Calls to [`light_update`](ProgressLog::light_update) will cause a call
     /// to [`update_with_count`](ProgressLog::update_with_count) only if the
-    /// current local count is a multiple of this mask plus one.
+    /// current local count is a multiple of this mask plus one and at least
+    /// equal to the threshold.
     ///
     /// Note that this constant is significantly smaller than the one used in
     /// [`ProgressLogger`], as updates will be further delayed by the threshold
     /// mechanism.
     pub const LIGHT_UPDATE_MASK: u32 = (1 << 10) - 1;
 
+    /// The maximum possible threshold for updating the underlying logger.
+    ///
+    /// Thresholds passed to [`with_threshold`](ConcurrentWrapper::with_threshold),
+    /// [`wrap_with_threshold`](Self::wrap_with_threshold), and
+    /// [`threshold`](Self::threshold) are clamped to this value, which
+    /// guarantees that the internal counter used by
+    /// [`light_update`](ProgressLog::light_update) cannot overflow.
+    pub const MAX_THRESHOLD: u32 = !Self::LIGHT_UPDATE_MASK;
+
     /// Sets the threshold for updating the underlying logger.
+    ///
+    /// The threshold is clamped to [`MAX_THRESHOLD`](Self::MAX_THRESHOLD).
     ///
     /// Note that concurrent loggers with the same underlying logger
     /// have independent thresholds.
     pub fn threshold(&mut self, threshold: u32) -> &mut Self {
-        self.threshold = threshold;
+        self.threshold = threshold.min(Self::MAX_THRESHOLD);
         self
     }
 
@@ -1426,21 +1459,63 @@ impl<P: ProgressLog> ConcurrentWrapper<P> {
 
     /// Wraps a given [`ProgressLog`] in a [`ConcurrentWrapper`] using a
     /// given threshold.
+    ///
+    /// The threshold is clamped to [`MAX_THRESHOLD`](Self::MAX_THRESHOLD).
     pub fn wrap_with_threshold(inner: P, threshold: u32) -> Self {
         Self {
             inner: Arc::new(Mutex::new(inner)),
             local_count: 0,
-            threshold,
+            threshold: threshold.min(Self::MAX_THRESHOLD),
         }
     }
 
-    /// Forces an update of the underlying logger with the current local count.
+    /// Buffers `count`, flushing the local count to the underlying logger if
+    /// the threshold has been reached; `now` is invoked only if a flush
+    /// actually happens.
+    fn buffer_or_flush(&mut self, count: usize, now: impl FnOnce() -> Instant) {
+        match (self.local_count as usize).checked_add(count) {
+            None => {
+                // Sum overflows, update in two steps
+                {
+                    let now = now();
+                    let mut inner = self.inner.lock().unwrap();
+                    inner.update_with_count_and_time(self.local_count as _, now);
+                    inner.update_with_count_and_time(count, now);
+                }
+                self.local_count = 0;
+            }
+            Some(total_count) => {
+                if total_count >= self.threshold as usize {
+                    self.local_count = 0;
+                    // Threshold reached, time to flush to the inner ProgressLog
+                    self.inner
+                        .lock()
+                        .unwrap()
+                        .update_with_count_and_time(total_count, now());
+                } else {
+                    // total_count is lower than self.threshold, which is a u32;
+                    // so total_count fits in u32.
+                    self.local_count = total_count as u32;
+                }
+            }
+        }
+    }
+
+    /// Forces an update of the underlying logger with the current local count,
+    /// if nonzero.
+    ///
+    /// If the local count is zero, this method has no effect; in particular,
+    /// dropping a wrapper after [`stop`](ProgressLog::stop) or
+    /// [`done`](ProgressLog::done) will not log spuriously. If the mutex
+    /// guarding the underlying logger has been poisoned by a panic in another
+    /// thread, the local count is discarded.
     pub fn flush(&mut self) {
-        self.inner
-            .lock()
-            .unwrap()
-            .update_with_count(self.local_count as _);
-        self.local_count = 0;
+        if self.local_count != 0 {
+            if let Ok(mut inner) = self.inner.lock() {
+                inner.update_with_count(self.local_count as _);
+            }
+            self.local_count = 0;
+        }
     }
 }
 
@@ -1460,11 +1535,7 @@ impl<P: ProgressLog + Clone> ConcurrentWrapper<P> {
 impl<P: ProgressLog + Clone + Send> ConcurrentProgressLog for ConcurrentWrapper<P> {
     type Duplicated = ConcurrentWrapper<P>;
     fn dup(&self) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(self.inner.lock().unwrap().clone())),
-            local_count: 0,
-            threshold: self.threshold,
-        }
+        ConcurrentWrapper::dup(self)
     }
 }
 
@@ -1547,39 +1618,13 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
     }
 
     #[inline]
-    fn update_with_count_and_time(&mut self, count: usize, _now: Instant) {
-        self.update_with_count(count);
+    fn update_with_count_and_time(&mut self, count: usize, now: Instant) {
+        self.buffer_or_flush(count, || now);
     }
 
     #[inline]
     fn update_with_count(&mut self, count: usize) {
-        match (self.local_count as usize).checked_add(count) {
-            None => {
-                // Sum overflows, update in two steps
-                {
-                    let now = Instant::now();
-                    let mut inner = self.inner.lock().unwrap();
-                    inner.update_with_count_and_time(self.local_count as _, now);
-                    inner.update_with_count_and_time(count, now);
-                }
-                self.local_count = 0;
-            }
-            Some(total_count) => {
-                if total_count >= self.threshold as usize {
-                    self.local_count = 0;
-                    // Threshold reached, time to flush to the inner ProgressLog
-                    let now = Instant::now();
-                    self.inner
-                        .lock()
-                        .unwrap()
-                        .update_with_count_and_time(total_count, now);
-                } else {
-                    // total_count is lower than self.threshold, which is a u32;
-                    // so total_count fits in u32.
-                    self.local_count = total_count as u32;
-                }
-            }
-        }
+        self.buffer_or_flush(count, Instant::now);
     }
 
     #[inline]
@@ -1666,7 +1711,7 @@ impl<P: ProgressLog> Drop for ConcurrentWrapper<P> {
     }
 }
 
-impl Display for ConcurrentWrapper {
+impl<P: ProgressLog + Display> Display for ConcurrentWrapper<P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         self.inner.lock().unwrap().fmt(f)
     }
@@ -1688,4 +1733,282 @@ pub mod prelude {
         ConcurrentProgressLog, ConcurrentWrapper, ProgressLog, ProgressLogger, TimeUnit,
         concurrent_progress_logger, no_logging, progress_logger,
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// A [`ProgressLog`] implementation that records counts and calls in
+    /// shared atomics, so that state remains observable through clones and
+    /// after drops.
+    #[derive(Clone, Default)]
+    struct MockLog {
+        count: Arc<AtomicUsize>,
+        update_calls: Arc<AtomicUsize>,
+    }
+
+    impl ProgressLog for MockLog {
+        type Concurrent = ConcurrentWrapper<MockLog>;
+
+        fn log(&mut self, _now: Instant) {}
+
+        fn log_if(&mut self, _now: Instant) {}
+
+        fn add_to_count(&mut self, count: usize) {
+            self.count.fetch_add(count, Ordering::Relaxed);
+        }
+
+        fn display_memory(&mut self, _display_memory: bool) -> &mut Self {
+            self
+        }
+
+        fn item_name(&mut self, _item_name: impl AsRef<str>) -> &mut Self {
+            self
+        }
+
+        fn log_interval(&mut self, _log_interval: Duration) -> &mut Self {
+            self
+        }
+
+        fn expected_updates(&mut self, _expected_updates: impl Into<Option<usize>>) -> &mut Self {
+            self
+        }
+
+        fn time_unit(&mut self, _time_unit: impl Into<Option<TimeUnit>>) -> &mut Self {
+            self
+        }
+
+        fn local_speed(&mut self, _local_speed: bool) -> &mut Self {
+            self
+        }
+
+        fn log_target(&mut self, _target: impl AsRef<str>) -> &mut Self {
+            self
+        }
+
+        fn push_log_target(&mut self, _suffix: impl AsRef<str>) -> &mut Self {
+            self
+        }
+
+        fn pop_log_target(&mut self) -> &mut Self {
+            self
+        }
+
+        fn log_level(&mut self, _log_level: Level) -> &mut Self {
+            self
+        }
+
+        fn start(&mut self, _msg: impl AsRef<str>) {
+            self.count.store(0, Ordering::Relaxed);
+        }
+
+        fn update(&mut self) {
+            self.update_with_count_and_time(1, Instant::now());
+        }
+
+        fn update_with_count_and_time(&mut self, count: usize, _now: Instant) {
+            self.count.fetch_add(count, Ordering::Relaxed);
+            self.update_calls.fetch_add(1, Ordering::Relaxed);
+        }
+
+        fn light_update(&mut self) {
+            self.update();
+        }
+
+        fn update_and_display(&mut self) {
+            self.update();
+        }
+
+        fn stop(&mut self) {}
+
+        fn done(&mut self) {}
+
+        fn done_with_count(&mut self, count: usize) {
+            self.count.store(count, Ordering::Relaxed);
+        }
+
+        fn elapsed(&self) -> Option<Duration> {
+            None
+        }
+
+        fn count(&self) -> usize {
+            self.count.load(Ordering::Relaxed)
+        }
+
+        fn refresh(&mut self) {}
+
+        fn trace(&self, _args: Arguments<'_>) {}
+
+        fn debug(&self, _args: Arguments<'_>) {}
+
+        fn info(&self, _args: Arguments<'_>) {}
+
+        fn warn(&self, _args: Arguments<'_>) {}
+
+        fn error(&self, _args: Arguments<'_>) {}
+
+        fn concurrent(&self) -> Self::Concurrent {
+            ConcurrentWrapper::wrap(self.clone())
+        }
+    }
+
+    #[test]
+    fn test_progress_logger_counting() {
+        let mut pl = ProgressLogger::default();
+        pl.start("");
+        pl.update();
+        pl.update_with_count(3);
+        pl.add_to_count(2);
+        pl.light_update();
+        assert_eq!(pl.count(), 7);
+        pl.stop();
+        assert!(pl.elapsed().is_some());
+    }
+
+    #[test]
+    fn test_start_resets_count() {
+        let mut pl = ProgressLogger::default();
+        pl.start("");
+        pl.update_with_count(10);
+        pl.stop();
+        pl.start("");
+        assert_eq!(pl.count(), 0);
+    }
+
+    #[test]
+    fn test_clone_resets_counters_and_expected_updates() {
+        let mut pl = ProgressLogger::default();
+        pl.item_name("pumpkin");
+        pl.log_target("target");
+        pl.expected_updates(100);
+        pl.start("");
+        pl.update_with_count(10);
+        let clone = pl.clone();
+        assert_eq!(clone.count(), 0);
+        assert!(clone.start_time.is_none());
+        assert_eq!(clone.item_name, "pumpkin");
+        assert_eq!(clone.items_name, "pumpkins");
+        assert_eq!(clone.log_target, "target");
+        // Documented behavior: expected updates are cleared on clone.
+        assert_eq!(clone.expected_updates, None);
+    }
+
+    #[test]
+    fn test_push_pop_log_target() {
+        let mut pl = ProgressLogger::default();
+        pl.log_target("main");
+        pl.push_log_target("::sub");
+        assert_eq!(pl.log_target, "main::sub");
+        pl.push_log_target("::subsub");
+        assert_eq!(pl.log_target, "main::sub::subsub");
+        pl.pop_log_target();
+        assert_eq!(pl.log_target, "main::sub");
+        pl.pop_log_target();
+        assert_eq!(pl.log_target, "main");
+        // Popping with no pushes is a no-op
+        pl.pop_log_target();
+        assert_eq!(pl.log_target, "main");
+        // Setting the log target clears pending suffixes
+        pl.push_log_target("::sub");
+        pl.log_target("other");
+        pl.pop_log_target();
+        assert_eq!(pl.log_target, "other");
+    }
+
+    #[test]
+    fn test_concurrent_threshold_buffering() {
+        let mock = MockLog::default();
+        let mut cpl = ConcurrentWrapper::wrap_with_threshold(mock.clone(), 4);
+        cpl.update();
+        cpl.update();
+        cpl.update();
+        assert_eq!(mock.count(), 0);
+        cpl.update();
+        assert_eq!(mock.count(), 4);
+    }
+
+    #[test]
+    fn test_concurrent_flush_on_drop() {
+        let mock = MockLog::default();
+        let mut cpl = ConcurrentWrapper::wrap_with_threshold(mock.clone(), 100);
+        {
+            let mut clone = cpl.clone();
+            clone.update();
+            clone.update();
+        }
+        assert_eq!(mock.count(), 2);
+        cpl.update();
+        drop(cpl);
+        assert_eq!(mock.count(), 3);
+    }
+
+    #[test]
+    fn test_flush_with_empty_buffer_is_noop() {
+        let mock = MockLog::default();
+        let mut cpl = ConcurrentWrapper::wrap_with_threshold(mock.clone(), 100);
+        cpl.update();
+        cpl.update();
+        cpl.done();
+        let update_calls = mock.update_calls.load(Ordering::Relaxed);
+        drop(cpl);
+        // Dropping after done() must not touch the inner logger again
+        assert_eq!(mock.update_calls.load(Ordering::Relaxed), update_calls);
+        assert_eq!(mock.count(), 2);
+    }
+
+    #[test]
+    fn test_light_update_flushes_at_threshold() {
+        let mock = MockLog::default();
+        let mut cpl = ConcurrentWrapper::wrap_with_threshold(mock.clone(), 1 << 10);
+        for _ in 0..(1 << 10) - 1 {
+            cpl.light_update();
+        }
+        assert_eq!(mock.count(), 0);
+        cpl.light_update();
+        assert_eq!(mock.count(), 1 << 10);
+    }
+
+    #[test]
+    fn test_threshold_clamping() {
+        let cpl = ConcurrentWrapper::with_threshold(u32::MAX);
+        assert_eq!(
+            cpl.threshold,
+            ConcurrentWrapper::<ProgressLogger>::MAX_THRESHOLD
+        );
+        let mut cpl = ConcurrentWrapper::wrap_with_threshold(MockLog::default(), u32::MAX);
+        assert_eq!(cpl.threshold, ConcurrentWrapper::<MockLog>::MAX_THRESHOLD);
+        cpl.threshold(u32::MAX - 5);
+        assert_eq!(cpl.threshold, ConcurrentWrapper::<MockLog>::MAX_THRESHOLD);
+    }
+
+    #[test]
+    fn test_clone_shares_dup_is_independent() {
+        let mut cpl = ConcurrentWrapper::wrap_with_threshold(ProgressLogger::default(), 1);
+        cpl.start("");
+        cpl.update();
+        assert_eq!(cpl.count(), 1);
+        // dup() wraps a clone of the inner logger, with counters reset
+        let mut dup = cpl.dup();
+        assert_eq!(dup.count(), 0);
+        dup.start("");
+        dup.update();
+        assert_eq!(dup.count(), 1);
+        assert_eq!(cpl.count(), 1);
+        // clone() shares the inner logger
+        let mut clone = cpl.clone();
+        clone.update();
+        assert_eq!(cpl.count(), 2);
+    }
+
+    #[test]
+    fn test_option_none_is_noop() {
+        let pl = no_logging![];
+        pl.update();
+        pl.update_with_count(10);
+        pl.light_update();
+        assert_eq!(pl.count(), 0);
+        assert!(pl.elapsed().is_none());
+    }
 }

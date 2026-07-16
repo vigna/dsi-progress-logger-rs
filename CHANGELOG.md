@@ -1,11 +1,42 @@
 # Change Log
 
+## [0.8.8] - 2026-07-16
+
+### New
+
+- New `ConcurrentWrapper::MAX_THRESHOLD` constant: thresholds are now
+  clamped to it, which guarantees that the internal counter used by
+  `light_update` cannot overflow.
+
+- `Display` is now implemented for `ConcurrentWrapper<P>` for all
+  `P: ProgressLog + Display`, not just for the default type parameter.
+
+### Fixed
+
+- `ProgressLog::refresh` now refreshes the available/free memory
+  statistics, too: previously, they were read only when memory display
+  was enabled, so they would become stale during long activities.
+
+- `ConcurrentWrapper::flush` is now a no-op when the local count is
+  zero. In particular, dropping a wrapper after `stop`/`done` no longer
+  emits a spurious log line.
+
+- Dropping a `ConcurrentWrapper` no longer panics if the mutex guarding
+  the underlying logger has been poisoned by a panic in another thread.
+
+- The `Option<P>` and `&mut P` implementations of `ProgressLog` now
+  forward `update_with_count` directly: previously, the default method
+  would read the clock even when no logging was performed.
+
+- `ConcurrentWrapper::update_with_count_and_time` now uses the provided
+  time instead of reading the clock again when flushing.
+
 ## [0.8.7] - 2026-04-29
 
 ### New
 
 - New `push_log_target`/`pop_log_target` methods that make it easier
-  to log subtask.
+  to log subtasks.
 
 ### Fixed
 
