@@ -1,10 +1,10 @@
 [package]
 name = "dsi-progress-logger"
-version = "0.8.8"
+version = "0.8.9"
 edition = "2024"
 description = "A tunable time-based progress logger to log progress information about long-running activities"
 repository = "https://github.com/vigna/dsi-progress-logger-rs"
-license = "Apache-2.0 OR LGPL-2.1-or-later"
+license = "Apache-2.0 OR MIT"
 readme = "README.md"
 keywords = ["log", "progress"]
 categories = ["development-tools::debugging"]
