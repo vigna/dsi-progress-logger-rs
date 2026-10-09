@@ -1,5 +1,27 @@
 # Change Log
 
+## unreleased
+
+### New
+
+- New `ProgressLog::format` setter and `Format` enum to choose how counts,
+  speeds, and per-item timings are displayed: plain, thousands separated, or
+  thousands separated with an SI prefix for speeds and timings (e.g.,
+  `346.59M nodes/s`). In particular, counts can now be thousands separated
+  even if a fixed time unit has been set with `ProgressLog::time_unit`.
+
+### Improved
+
+- By default, speeds and per-item timings are now thousands separated (e.g.,
+  `346,588,344.72 nodes/s`), like counts, unless a fixed time unit has been
+  set with `ProgressLog::time_unit`.
+
+### Fixed
+
+- `scale` and `humanize` now keep values of 10²⁷ or more in yottas:
+  previously, they divided them once more by 1000 after reaching the `Y`
+  prefix, so they displayed them 1000 times too small.
+
 ## [0.8.9] - 2026-07-23
 
 ### Changed

@@ -5,6 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0 OR MIT
  */
 
+use num_format::{Locale, ToFormattedString};
+
 /// A unit of time, from nanoseconds to days.
 ///
 /// Time units are used to display timings and speeds. Usually the most
@@ -129,6 +131,44 @@ impl TimeUnit {
     }
 }
 
+/// A format for counts, speeds, and per-item timings.
+///
+/// Counts are always exact: SI prefixes are used only for speeds and timings.
+///
+/// The format is set with [`ProgressLog::format`](crate::ProgressLog::format).
+#[derive(Debug, Copy, Clone)]
+pub enum Format {
+    /// No thousands separators, and two decimal digits for speeds and timings
+    /// (e.g., `346588344` and `346588344.72`).
+    Plain,
+    /// Commas as thousands separators, and two decimal digits for speeds and
+    /// timings (e.g., `346,588,344` and `346,588,344.72`).
+    Separated,
+    /// Commas as thousands separators for counts, and two decimal digits and an
+    /// SI prefix, as in [`humanize`], for speeds and timings (e.g.,
+    /// `346,588,344` and `346.59M`).
+    Si,
+}
+
+impl Format {
+    /// Formats a count in this format.
+    pub(crate) fn format_count(self, count: usize) -> String {
+        match self {
+            Format::Plain => count.to_string(),
+            Format::Separated | Format::Si => count.to_formatted_string(&Locale::en),
+        }
+    }
+
+    /// Formats a speed or a per-item timing in this format.
+    pub(crate) fn format_speed(self, val: f64) -> String {
+        match self {
+            Format::Plain => format!("{val:.2}"),
+            Format::Separated => separate_thousands(val),
+            Format::Si => humanize(val),
+        }
+    }
+}
+
 /// Scales down a value by powers of 1000, returning the scaled value and the
 /// associated SI prefix.
 ///
@@ -137,7 +177,7 @@ impl TimeUnit {
 pub const fn scale(mut val: f64) -> (f64, &'static str) {
     const UNITS: &[&str] = &["", "k", "M", "G", "T", "P", "E", "Z", "Y"];
     let mut i = 0;
-    while i < UNITS.len() {
+    while i < UNITS.len() - 1 {
         if val < 1000.0 {
             return (val, UNITS[i]);
         }
@@ -153,6 +193,31 @@ pub const fn scale(mut val: f64) -> (f64, &'static str) {
 pub fn humanize(val: f64) -> String {
     let (val, unit) = scale(val);
     format!("{:.2}{}", val, unit)
+}
+
+/// Formats a value using two decimal digits and commas as thousands separators
+/// (e.g., `1,234,567.89`).
+///
+/// The digits are exactly those of `format!("{:.2}", val)`; non-finite values
+/// are formatted in the same way.
+fn separate_thousands(val: f64) -> String {
+    let s = format!("{val:.2}");
+    // Non-finite values (inf, NaN) have no decimal point
+    let Some(point) = s.find('.') else {
+        return s;
+    };
+    let (int, frac) = s.split_at(point);
+    let (sign, int) = int.split_at(usize::from(int.starts_with('-')));
+    let mut result = String::with_capacity(s.len() + int.len() / 3);
+    result.push_str(sign);
+    for (i, digit) in int.chars().enumerate() {
+        if i != 0 && (int.len() - i) % 3 == 0 {
+            result.push(',');
+        }
+        result.push(digit);
+    }
+    result.push_str(frac);
+    result
 }
 
 #[cfg(test)]
@@ -171,6 +236,24 @@ mod tests {
         assert_eq!(humanize(1000.0), "1.00k");
         assert_eq!(humanize(12_345.0), "12.35k");
         assert_eq!(humanize(1_234_567_890.0), "1.23G");
+        assert_eq!(humanize(1e24), "1.00Y");
+        // Values of 10²⁷ or more stay at the last prefix
+        assert_eq!(humanize(1e27), "1000.00Y");
+        assert_eq!(humanize(1.5e30), "1500000.00Y");
+    }
+
+    #[test]
+    fn test_separate_thousands() {
+        assert_eq!(separate_thousands(0.0), "0.00");
+        assert_eq!(separate_thousands(999.994), "999.99");
+        // Rounding can add a digit
+        assert_eq!(separate_thousands(999.999), "1,000.00");
+        assert_eq!(separate_thousands(123_456.0), "123,456.00");
+        assert_eq!(separate_thousands(1_234_567.891), "1,234,567.89");
+        assert_eq!(separate_thousands(346_588_344.72), "346,588,344.72");
+        assert_eq!(separate_thousands(-123_456.0), "-123,456.00");
+        assert_eq!(separate_thousands(f64::INFINITY), "inf");
+        assert_eq!(separate_thousands(f64::NAN), "NaN");
     }
 
     #[test]
