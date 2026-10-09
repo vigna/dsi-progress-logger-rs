@@ -1,5 +1,13 @@
 # Change Log
 
+## unreleased
+
+### Improved
+
+- Speeds and per-item timings are now thousands separated (e.g.,
+  `346,588,344.72 nodes/s`), like counts, unless a fixed time unit has been
+  set with `ProgressLog::time_unit`.
+
 ## [0.8.9] - 2026-07-23
 
 ### Changed

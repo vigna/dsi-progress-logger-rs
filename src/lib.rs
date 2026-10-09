@@ -957,12 +957,22 @@ impl ProgressLogger {
             .time_unit
             .unwrap_or_else(|| TimeUnit::nice_speed_unit(seconds_per_item));
 
+        // As for counts, large numbers are thousands separated unless the time
+        // unit is fixed
+        let format_value = |value: f64| {
+            if self.time_unit.is_none() {
+                separate_thousands(value)
+            } else {
+                format!("{value:.2}")
+            }
+        };
+
         f.write_fmt(format_args!(
-            "{:.2} {}/{}, {:.2} {}/{}",
-            items_per_second * time_unit_speed.as_seconds(),
+            "{} {}/{}, {} {}/{}",
+            format_value(items_per_second * time_unit_speed.as_seconds()),
             self.items_name,
             time_unit_speed.label(),
-            seconds_per_item / time_unit_timing.as_seconds(),
+            format_value(seconds_per_item / time_unit_timing.as_seconds()),
             time_unit_timing.label(),
             self.item_name
         ))?;
@@ -1915,6 +1925,25 @@ mod tests {
         pl.log_target("other");
         pl.pop_log_target();
         assert_eq!(pl.log_target, "other");
+    }
+
+    #[test]
+    fn test_display_thousands_separators() {
+        let mut pl = ProgressLogger::default();
+        let start_time = Instant::now();
+        pl.start_time = Some(start_time);
+        pl.stop_time = Some(start_time + Duration::from_secs(1));
+        pl.count = 1_234_567_890;
+        assert_eq!(
+            pl.to_string(),
+            "Elapsed: 1s [1,234,567,890 items, 1,234,567,890.00 items/s, 0.81 ns/item]"
+        );
+        // A fixed time unit disables thousands separators
+        pl.time_unit(TimeUnit::Seconds);
+        assert_eq!(
+            pl.to_string(),
+            "Elapsed: 1s [1234567890 items, 1234567890.00 items/s, 0.00 s/item]"
+        );
     }
 
     #[test]

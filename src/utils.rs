@@ -155,6 +155,31 @@ pub fn humanize(val: f64) -> String {
     format!("{:.2}{}", val, unit)
 }
 
+/// Formats a value using two decimal digits and commas as thousands separators
+/// (e.g., `1,234,567.89`).
+///
+/// The digits are exactly those of `format!("{:.2}", val)`; non-finite values
+/// are formatted in the same way.
+pub(crate) fn separate_thousands(val: f64) -> String {
+    let s = format!("{val:.2}");
+    // Non-finite values (inf, NaN) have no decimal point
+    let Some(point) = s.find('.') else {
+        return s;
+    };
+    let (int, frac) = s.split_at(point);
+    let (sign, int) = int.split_at(usize::from(int.starts_with('-')));
+    let mut result = String::with_capacity(s.len() + int.len() / 3);
+    result.push_str(sign);
+    for (i, digit) in int.chars().enumerate() {
+        if i != 0 && (int.len() - i) % 3 == 0 {
+            result.push(',');
+        }
+        result.push(digit);
+    }
+    result.push_str(frac);
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,6 +196,20 @@ mod tests {
         assert_eq!(humanize(1000.0), "1.00k");
         assert_eq!(humanize(12_345.0), "12.35k");
         assert_eq!(humanize(1_234_567_890.0), "1.23G");
+    }
+
+    #[test]
+    fn test_separate_thousands() {
+        assert_eq!(separate_thousands(0.0), "0.00");
+        assert_eq!(separate_thousands(999.994), "999.99");
+        // Rounding can add a digit
+        assert_eq!(separate_thousands(999.999), "1,000.00");
+        assert_eq!(separate_thousands(123_456.0), "123,456.00");
+        assert_eq!(separate_thousands(1_234_567.891), "1,234,567.89");
+        assert_eq!(separate_thousands(346_588_344.72), "346,588,344.72");
+        assert_eq!(separate_thousands(-123_456.0), "-123,456.00");
+        assert_eq!(separate_thousands(f64::INFINITY), "inf");
+        assert_eq!(separate_thousands(f64::NAN), "NaN");
     }
 
     #[test]
