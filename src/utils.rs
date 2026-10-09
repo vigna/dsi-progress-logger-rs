@@ -5,6 +5,8 @@
  * SPDX-License-Identifier: Apache-2.0 OR MIT
  */
 
+use num_format::{Locale, ToFormattedString};
+
 /// A unit of time, from nanoseconds to days.
 ///
 /// Time units are used to display timings and speeds. Usually the most
@@ -129,29 +131,40 @@ impl TimeUnit {
     }
 }
 
-/// A format for speeds and per-item timings.
+/// A format for counts, speeds, and per-item timings.
 ///
-/// The format is set with
-/// [`ProgressLog::speed_format`](crate::ProgressLog::speed_format).
+/// Counts are always exact: SI prefixes are used only for speeds and timings.
+///
+/// The format is set with [`ProgressLog::format`](crate::ProgressLog::format).
 #[derive(Debug, Copy, Clone)]
-pub enum SpeedFormat {
-    /// Two decimal digits (e.g., `346588344.72`).
+pub enum Format {
+    /// No thousands separators, and two decimal digits for speeds and timings
+    /// (e.g., `346588344` and `346588344.72`).
     Plain,
-    /// Two decimal digits and commas as thousands separators (e.g.,
-    /// `346,588,344.72`).
+    /// Commas as thousands separators, and two decimal digits for speeds and
+    /// timings (e.g., `346,588,344` and `346,588,344.72`).
     Separated,
-    /// Two decimal digits and an SI prefix, as in [`humanize`] (e.g.,
-    /// `346.59M`).
+    /// Commas as thousands separators for counts, and two decimal digits and an
+    /// SI prefix, as in [`humanize`], for speeds and timings (e.g.,
+    /// `346,588,344` and `346.59M`).
     Si,
 }
 
-impl SpeedFormat {
-    /// Formats a value in this format.
-    pub(crate) fn format(self, val: f64) -> String {
+impl Format {
+    /// Formats a count in this format.
+    pub(crate) fn format_count(self, count: usize) -> String {
         match self {
-            SpeedFormat::Plain => format!("{val:.2}"),
-            SpeedFormat::Separated => separate_thousands(val),
-            SpeedFormat::Si => humanize(val),
+            Format::Plain => count.to_string(),
+            Format::Separated | Format::Si => count.to_formatted_string(&Locale::en),
+        }
+    }
+
+    /// Formats a speed or a per-item timing in this format.
+    pub(crate) fn format_speed(self, val: f64) -> String {
+        match self {
+            Format::Plain => format!("{val:.2}"),
+            Format::Separated => separate_thousands(val),
+            Format::Si => humanize(val),
         }
     }
 }

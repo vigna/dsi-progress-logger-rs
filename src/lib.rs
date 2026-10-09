@@ -9,7 +9,6 @@
 #![doc = include_str!("../README.md")]
 
 use log::{Level, debug, error, info, log, trace, warn};
-use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
 use std::fmt::{Arguments, Display, Formatter, Result};
 use std::sync::{Arc, Mutex};
@@ -125,25 +124,25 @@ pub trait ProgressLog {
     /// If not [`None`], the logger will always display the speed in this unit
     /// instead of making a choice of readable unit based on the elapsed time.
     /// Moreover, large numbers will not be thousands separated (but see
-    /// [`speed_format`](ProgressLog::speed_format)). This behavior is useful
-    /// when the output of the logger must be parsed.
+    /// [`format`](ProgressLog::format)). This behavior is useful when the
+    /// output of the logger must be parsed.
     ///
     /// Note that there is no need to use a [`Some`]
     /// wrapper around the argument, as the method will automatically convert it
     /// to an [`Option`] type.
     fn time_unit(&mut self, time_unit: impl Into<Option<TimeUnit>>) -> &mut Self;
 
-    /// Sets the format of speeds and per-item timings.
+    /// Sets the format of counts, speeds, and per-item timings.
     ///
-    /// If [`None`] (the default), speeds and timings will be displayed using
-    /// [`SpeedFormat::Separated`], unless a fixed time unit has been set with
+    /// If [`None`] (the default), numbers will be displayed using
+    /// [`Format::Separated`], unless a fixed time unit has been set with
     /// [`time_unit`](ProgressLog::time_unit), in which case they will be
-    /// displayed using [`SpeedFormat::Plain`].
+    /// displayed using [`Format::Plain`].
     ///
     /// Note that there is no need to use a [`Some`]
     /// wrapper around the argument, as the method will automatically convert it
     /// to an [`Option`] type.
-    fn speed_format(&mut self, speed_format: impl Into<Option<SpeedFormat>>) -> &mut Self;
+    fn format(&mut self, format: impl Into<Option<Format>>) -> &mut Self;
 
     /// Sets whether to display additionally the speed achieved during the last
     /// log interval.
@@ -441,8 +440,8 @@ impl<P: ProgressLog> ProgressLog for &mut P {
         self
     }
 
-    fn speed_format(&mut self, speed_format: impl Into<Option<SpeedFormat>>) -> &mut Self {
-        (**self).speed_format(speed_format.into());
+    fn format(&mut self, format: impl Into<Option<Format>>) -> &mut Self {
+        (**self).format(format.into());
         self
     }
 
@@ -600,9 +599,9 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         self
     }
 
-    fn speed_format(&mut self, speed_format: impl Into<Option<SpeedFormat>>) -> &mut Self {
+    fn format(&mut self, format: impl Into<Option<Format>>) -> &mut Self {
         if let Some(pl) = self {
-            pl.speed_format(speed_format.into());
+            pl.format(format.into());
         }
         self
     }
@@ -848,12 +847,12 @@ pub struct ProgressLogger {
     expected_updates: Option<usize>,
     /// The time unit to use for speed. If set, the logger will always display the speed in this unit
     /// instead of making a choice of readable unit based on the elapsed time. Moreover, large numbers
-    /// will not be thousands separated (but see `speed_format`). This is useful when the output of the
+    /// will not be thousands separated (but see `format`). This is useful when the output of the
     /// logger must be parsed.
     time_unit: Option<TimeUnit>,
-    /// The format of speeds and per-item timings. If not set, speeds and timings are thousands
+    /// The format of counts, speeds, and per-item timings. If not set, numbers are thousands
     /// separated, unless `time_unit` is set.
-    speed_format: Option<SpeedFormat>,
+    format: Option<Format>,
     /// Display additionally the speed achieved during the last log interval.
     local_speed: bool,
     /// [`mod@log`] target
@@ -892,7 +891,7 @@ impl Default for ProgressLogger {
             log_interval: Duration::from_secs(10),
             expected_updates: None,
             time_unit: None,
-            speed_format: None,
+            format: None,
             local_speed: false,
             log_target: std::env::current_exe()
                 .ok()
@@ -932,7 +931,7 @@ impl Clone for ProgressLogger {
             items_name: self.items_name.clone(),
             log_interval: self.log_interval,
             time_unit: self.time_unit,
-            speed_format: self.speed_format,
+            format: self.format,
             local_speed: self.local_speed,
             log_level: self.log_level,
             log_target: self.log_target.clone(),
@@ -977,7 +976,12 @@ impl ProgressLogger {
     /// plus one.
     pub const LIGHT_UPDATE_MASK: usize = (1 << 20) - 1;
 
-    fn fmt_timing_speed(&self, f: &mut Formatter<'_>, seconds_per_item: f64) -> Result {
+    fn fmt_timing_speed(
+        &self,
+        f: &mut Formatter<'_>,
+        seconds_per_item: f64,
+        format: Format,
+    ) -> Result {
         let items_per_second = 1.0 / seconds_per_item;
 
         let time_unit_timing = self
@@ -988,20 +992,12 @@ impl ProgressLogger {
             .time_unit
             .unwrap_or_else(|| TimeUnit::nice_speed_unit(seconds_per_item));
 
-        // As for counts, large numbers are thousands separated unless the time
-        // unit is fixed, but the format can be set explicitly
-        let speed_format = self.speed_format.unwrap_or(if self.time_unit.is_none() {
-            SpeedFormat::Separated
-        } else {
-            SpeedFormat::Plain
-        });
-
         f.write_fmt(format_args!(
             "{} {}/{}, {} {}/{}",
-            speed_format.format(items_per_second * time_unit_speed.as_seconds()),
+            format.format_speed(items_per_second * time_unit_speed.as_seconds()),
             self.items_name,
             time_unit_speed.label(),
-            speed_format.format(seconds_per_item / time_unit_timing.as_seconds()),
+            format.format_speed(seconds_per_item / time_unit_timing.as_seconds()),
             time_unit_timing.label(),
             self.item_name
         ))?;
@@ -1067,8 +1063,8 @@ impl ProgressLog for ProgressLogger {
         self
     }
 
-    fn speed_format(&mut self, speed_format: impl Into<Option<SpeedFormat>>) -> &mut Self {
-        self.speed_format = speed_format.into();
+    fn format(&mut self, format: impl Into<Option<Format>>) -> &mut Self {
+        self.format = format.into();
         self
     }
 
@@ -1206,11 +1202,14 @@ impl ProgressLog for ProgressLogger {
 impl Display for ProgressLogger {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         if let Some(start_time) = self.start_time {
-            let count_fmtd = if self.time_unit.is_none() {
-                self.count.to_formatted_string(&Locale::en)
+            // Numbers are thousands separated unless the time unit is fixed,
+            // but the format can be set explicitly
+            let format = self.format.unwrap_or(if self.time_unit.is_none() {
+                Format::Separated
             } else {
-                self.count.to_string()
-            };
+                Format::Plain
+            });
+            let count_fmtd = format.format_count(self.count);
 
             if let Some(stop_time) = self.stop_time {
                 let elapsed = stop_time - start_time;
@@ -1231,7 +1230,7 @@ impl Display for ProgressLogger {
                             &self.items_name
                         }
                     ))?;
-                    self.fmt_timing_speed(f, seconds_per_item)?;
+                    self.fmt_timing_speed(f, seconds_per_item, format)?;
                     f.write_fmt(format_args!("]"))?
                 }
             } else {
@@ -1253,7 +1252,7 @@ impl Display for ProgressLogger {
                 if self.count != 0 {
                     let seconds_per_item = elapsed.as_secs_f64() / self.count as f64;
                     f.write_fmt(format_args!(", "))?;
-                    self.fmt_timing_speed(f, seconds_per_item)?;
+                    self.fmt_timing_speed(f, seconds_per_item, format)?;
 
                     if let Some(expected_updates) = self.expected_updates {
                         let millis_to_end: u128 = (expected_updates.saturating_sub(self.count)
@@ -1274,7 +1273,7 @@ impl Display for ProgressLogger {
                         let elapsed = now - self.last_log_time;
                         let seconds_per_item =
                             elapsed.as_secs_f64() / (self.count - self.last_count) as f64;
-                        self.fmt_timing_speed(f, seconds_per_item)?;
+                        self.fmt_timing_speed(f, seconds_per_item, format)?;
 
                         f.write_fmt(format_args!("]"))?;
                     }
@@ -1626,8 +1625,8 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
         self
     }
 
-    fn speed_format(&mut self, speed_format: impl Into<Option<SpeedFormat>>) -> &mut Self {
-        self.inner.lock().unwrap().speed_format(speed_format.into());
+    fn format(&mut self, format: impl Into<Option<Format>>) -> &mut Self {
+        self.inner.lock().unwrap().format(format.into());
         self
     }
 
@@ -1779,8 +1778,8 @@ pub mod prelude {
     pub use log::Level;
 
     pub use super::{
-        ConcurrentProgressLog, ConcurrentWrapper, ProgressLog, ProgressLogger, SpeedFormat,
-        TimeUnit, concurrent_progress_logger, no_logging, progress_logger,
+        ConcurrentProgressLog, ConcurrentWrapper, Format, ProgressLog, ProgressLogger, TimeUnit,
+        concurrent_progress_logger, no_logging, progress_logger,
     };
 }
 
@@ -1829,7 +1828,7 @@ mod tests {
             self
         }
 
-        fn speed_format(&mut self, _speed_format: impl Into<Option<SpeedFormat>>) -> &mut Self {
+        fn format(&mut self, _format: impl Into<Option<Format>>) -> &mut Self {
             self
         }
 
@@ -1971,7 +1970,7 @@ mod tests {
     }
 
     #[test]
-    fn test_speed_format() {
+    fn test_format() {
         let mut pl = ProgressLogger::default();
         let start_time = Instant::now();
         pl.start_time = Some(start_time);
@@ -1981,12 +1980,13 @@ mod tests {
             pl.to_string(),
             "Elapsed: 1s [1,234,567,890 items, 1,234,567,890.00 items/s, 0.81 ns/item]"
         );
-        pl.speed_format(SpeedFormat::Plain);
+        pl.format(Format::Plain);
         assert_eq!(
             pl.to_string(),
-            "Elapsed: 1s [1,234,567,890 items, 1234567890.00 items/s, 0.81 ns/item]"
+            "Elapsed: 1s [1234567890 items, 1234567890.00 items/s, 0.81 ns/item]"
         );
-        pl.speed_format(SpeedFormat::Si);
+        // SI prefixes are used only for speeds and timings: counts stay exact
+        pl.format(Format::Si);
         assert_eq!(
             pl.to_string(),
             "Elapsed: 1s [1,234,567,890 items, 1.23G items/s, 0.81 ns/item]"
@@ -1996,14 +1996,14 @@ mod tests {
         pl.time_unit(TimeUnit::MilliSeconds);
         assert_eq!(
             pl.to_string(),
-            "Elapsed: 1s [1234567890 items, 1.23M items/ms, 0.00 ms/item]"
+            "Elapsed: 1s [1,234,567,890 items, 1.23M items/ms, 0.00 ms/item]"
         );
-        pl.speed_format(SpeedFormat::Separated);
+        pl.format(Format::Separated);
         assert_eq!(
             pl.to_string(),
-            "Elapsed: 1s [1234567890 items, 1,234,567.89 items/ms, 0.00 ms/item]"
+            "Elapsed: 1s [1,234,567,890 items, 1,234,567.89 items/ms, 0.00 ms/item]"
         );
-        pl.speed_format(None);
+        pl.format(None);
         assert_eq!(
             pl.to_string(),
             "Elapsed: 1s [1234567890 items, 1234567.89 items/ms, 0.00 ms/item]"

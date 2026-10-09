@@ -4,9 +4,11 @@
 
 ### New
 
-- New `ProgressLog::speed_format` setter and `SpeedFormat` enum to choose how
-  speeds and per-item timings are displayed: plain, thousands separated, or
-  with an SI prefix (e.g., `346.59M nodes/s`).
+- New `ProgressLog::format` setter and `Format` enum to choose how counts,
+  speeds, and per-item timings are displayed: plain, thousands separated, or
+  thousands separated with an SI prefix for speeds and timings (e.g.,
+  `346.59M nodes/s`). In particular, counts can now be thousands separated
+  even if a fixed time unit has been set with `ProgressLog::time_unit`.
 
 ### Improved
 
