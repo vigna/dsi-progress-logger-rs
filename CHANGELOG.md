@@ -14,6 +14,12 @@
   `346,588,344.72 nodes/s`), like counts, unless a fixed time unit has been
   set with `ProgressLog::time_unit`.
 
+### Fixed
+
+- `scale` and `humanize` now keep values of 10²⁷ or more in yottas:
+  previously, they divided them once more by 1000 after reaching the `Y`
+  prefix, so they displayed them 1000 times too small.
+
 ## [0.8.9] - 2026-07-23
 
 ### Changed

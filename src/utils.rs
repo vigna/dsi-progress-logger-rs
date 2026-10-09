@@ -164,7 +164,7 @@ impl SpeedFormat {
 pub const fn scale(mut val: f64) -> (f64, &'static str) {
     const UNITS: &[&str] = &["", "k", "M", "G", "T", "P", "E", "Z", "Y"];
     let mut i = 0;
-    while i < UNITS.len() {
+    while i < UNITS.len() - 1 {
         if val < 1000.0 {
             return (val, UNITS[i]);
         }
@@ -223,6 +223,10 @@ mod tests {
         assert_eq!(humanize(1000.0), "1.00k");
         assert_eq!(humanize(12_345.0), "12.35k");
         assert_eq!(humanize(1_234_567_890.0), "1.23G");
+        assert_eq!(humanize(1e24), "1.00Y");
+        // Values of 10²⁷ or more stay at the last prefix
+        assert_eq!(humanize(1e27), "1000.00Y");
+        assert_eq!(humanize(1.5e30), "1500000.00Y");
     }
 
     #[test]
