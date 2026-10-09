@@ -129,6 +129,33 @@ impl TimeUnit {
     }
 }
 
+/// A format for speeds and per-item timings.
+///
+/// The format is set with
+/// [`ProgressLog::speed_format`](crate::ProgressLog::speed_format).
+#[derive(Debug, Copy, Clone)]
+pub enum SpeedFormat {
+    /// Two decimal digits (e.g., `346588344.72`).
+    Plain,
+    /// Two decimal digits and commas as thousands separators (e.g.,
+    /// `346,588,344.72`).
+    Separated,
+    /// Two decimal digits and an SI prefix, as in [`humanize`] (e.g.,
+    /// `346.59M`).
+    Si,
+}
+
+impl SpeedFormat {
+    /// Formats a value in this format.
+    pub(crate) fn format(self, val: f64) -> String {
+        match self {
+            SpeedFormat::Plain => format!("{val:.2}"),
+            SpeedFormat::Separated => separate_thousands(val),
+            SpeedFormat::Si => humanize(val),
+        }
+    }
+}
+
 /// Scales down a value by powers of 1000, returning the scaled value and the
 /// associated SI prefix.
 ///
@@ -160,7 +187,7 @@ pub fn humanize(val: f64) -> String {
 ///
 /// The digits are exactly those of `format!("{:.2}", val)`; non-finite values
 /// are formatted in the same way.
-pub(crate) fn separate_thousands(val: f64) -> String {
+fn separate_thousands(val: f64) -> String {
     let s = format!("{val:.2}");
     // Non-finite values (inf, NaN) have no decimal point
     let Some(point) = s.find('.') else {
