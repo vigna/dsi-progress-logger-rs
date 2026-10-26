@@ -1,5 +1,16 @@
 # Change Log
 
+## [0.8.10] - 2026-10-26
+
+### Fixed
+
+- `ProgressLogger` refreshed memory information when logging and when
+  done even if its log level was disabled. Since a refresh can take
+  milliseconds on some systems, this could slow down significantly code
+  using many short-lived loggers displaying memory (e.g., one per shard
+  of a parallel computation). Now memory information is refreshed only
+  if the message is actually logged.
+
 ## [0.8.9] - 2026-07-23
 
 ### Changed

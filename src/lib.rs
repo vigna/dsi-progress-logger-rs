@@ -8,7 +8,7 @@
 
 #![doc = include_str!("../README.md")]
 
-use log::{Level, debug, error, info, log, trace, warn};
+use log::{Level, debug, error, info, log, log_enabled, trace, warn};
 use num_format::{Locale, ToFormattedString};
 use pluralizer::pluralize;
 use std::fmt::{Arguments, Display, Formatter, Result};
@@ -975,8 +975,12 @@ impl ProgressLog for ProgressLogger {
     type Concurrent = ConcurrentWrapper<Self>;
 
     fn log(&mut self, now: Instant) {
-        self.refresh();
-        log!(target: &self.log_target, self.log_level, "{}", self);
+        // Refreshing memory information is expensive (milliseconds on some
+        // systems), so we do it only if the message will be logged
+        if log_enabled!(target: &self.log_target, self.log_level) {
+            self.refresh();
+            log!(target: &self.log_target, self.log_level, "{}", self);
+        }
         self.last_count = self.count;
         self.last_log_time = now;
         self.next_log_time = now + self.log_interval;
@@ -1115,9 +1119,12 @@ impl ProgressLog for ProgressLogger {
 
     fn done(&mut self) {
         self.stop();
-        log!(target: &self.log_target, self.log_level, "Completed.");
-        self.refresh();
-        log!(target: &self.log_target, self.log_level, "{}", self);
+        // See the comment in log()
+        if log_enabled!(target: &self.log_target, self.log_level) {
+            log!(target: &self.log_target, self.log_level, "Completed.");
+            self.refresh();
+            log!(target: &self.log_target, self.log_level, "{}", self);
+        }
     }
 
     fn done_with_count(&mut self, count: usize) {
