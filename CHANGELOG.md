@@ -1,6 +1,6 @@
 # Change Log
 
-## [0.8.11] - unreleased
+## [0.8.11] - 2026-11-15
 
 ### New
 
