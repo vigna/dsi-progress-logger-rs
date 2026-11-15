@@ -38,25 +38,34 @@ single-threaded logging.
 
 ## Optional Logging
 
-This crate supports optional logging by implementing [`ProgressLog`] for
-`Option<ProgressLog>::None` as a no-op. As a result, you can pass to functions
-an argument `pl` that is a `&mut impl ProgressLog`, with the following behavior:
+This crate supports optional logging by implementing [`ProgressLog`] for the
+zero-sized type [`NoLogs`], whose methods do nothing, and for
+`Option<ProgressLog>`, with `None` as a no-op. As a result, you can pass to
+functions an argument `pl` that is a `&mut impl ProgressLog`, with the following
+behavior:
 
 - if you pass a `&mut ProgressLogger`, the progress logger will be used, without
   any check;
-- if you pass a `&mut Option::<ProgressLogger>::None`, no logging will be
-  performed, and in fact the logging code should be entirely optimized away by
-  the compiler; the macro [`no_logging!`] can be used as a convenient way to
-  switch off logging;
+- if you pass a `&mut NoLogs`, no logging will be performed, and no logging code
+  will be generated, as the choice is made at compile time by the type; the
+  macro [`no_logs!`] can be used as a convenient way to switch off logging;
 - if you pass an `&mut Option<ProgressLogger>`, logging will happen depending on
-  the variant, and there will be a runtime check for each call.
+  the variant, and there will be a runtime check for each call: use this
+  approach when you need to choose at runtime whether to log.
+
+Note that the arguments of the methods are evaluated in all cases: for example,
+`pl.start(format!("Reading {n} keys..."))` will allocate and format a string
+even if no logging is performed. If you use instead
+`pl.start_with(format_args!("Reading {n} keys..."))`, the message will be
+formatted only if it is actually displayed (see [`start_with`]).
 
 All of the above applies to [`ConcurrentProgressLog`], too. Moreover, the
 [`ProgressLog::concurrent`] method can be used to obtain a
 [`ConcurrentProgressLog`] from a [`ProgressLog`]. Thus, in case you need both
 sequential and concurrent logging you can pass a `&mut impl ProgressLog` and
-then obtain a concurrent logger from it. If the original logger is `None`, the
-concurrent logger will be `None`, too, and so on.
+then obtain a concurrent logger from it. If the original logger is a [`NoLogs`],
+the concurrent logger will be a [`NoLogs`], too; if it is `None`, the concurrent
+logger will be `None`, too, and so on.
 
 There is an [`info`] method that can be used to log information to the logger at
 the `info` level. The advantage of using [`info`] is that the logging will be
@@ -81,3 +90,6 @@ MUR can be held responsible for them.
 [DSI Utilities]: https://dsiutils.di.unimi.it/
 [`log`]: https://docs.rs/log
 [`no_logging!`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/macro.no_logging.html
+[`no_logs!`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/macro.no_logs.html
+[`NoLogs`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/struct.NoLogs.html
+[`start_with`]: https://docs.rs/dsi-progress-logger/latest/dsi_progress_logger/trait.ProgressLog.html#method.start_with

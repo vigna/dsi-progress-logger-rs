@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         expected_updates = (100 * ITER_PER_THREAD).try_into().ok()
     ];
 
-    cpl.start(format!(
+    cpl.start_with(format_args!(
         "Smashing {} pumpkins (using many threads)...",
         100 * ITER_PER_THREAD
     ));

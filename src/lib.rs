@@ -229,7 +229,35 @@ pub trait ProgressLog {
     /// Starts the logger, displaying the given message.
     ///
     /// An empty string can be passed to display nothing.
+    ///
+    /// Note that this method should be used only when the message is a
+    /// constant string, as in `pl.start("Reading keys...")`. If the message
+    /// is built at runtime, [`start_with`](ProgressLog::start_with) is
+    /// preferred. The reason is that the arguments of a method are evaluated
+    /// before the call, whatever the logger does with them: thus,
+    /// `pl.start(format!("Reading {n} keys..."))` allocates and formats the
+    /// message even if logging is disabled, and even if the logger is a
+    /// [`NoLogs`] (e.g., when [`no_logs!`] is used), so the logging code is
+    /// not entirely eliminated. Instead,
+    /// `pl.start_with(format_args!("Reading {n} keys..."))` builds no
+    /// string: the message is formatted only if it is actually displayed.
     fn start(&mut self, msg: impl AsRef<str>);
+
+    /// Starts the logger, displaying the message given by the result of
+    /// [`format_args!`].
+    ///
+    /// This method is equivalent to [`start`](ProgressLog::start), but the
+    /// implementations of this crate format the message only if it is
+    /// actually displayed: for example, `pl.start(format!("Reading {n}
+    /// keys..."))` allocates and formats a string even if logging is
+    /// disabled, whereas `pl.start_with(format_args!("Reading {n}
+    /// keys..."))` does not.
+    ///
+    /// The default implementation formats the message and passes it to
+    /// [`start`](ProgressLog::start).
+    fn start_with(&mut self, args: Arguments<'_>) {
+        self.start(std::fmt::format(args));
+    }
 
     /// Increases the count and checks whether it is time to log.
     fn update(&mut self);
@@ -457,6 +485,10 @@ impl<P: ProgressLog> ProgressLog for &mut P {
         (**self).start(msg);
     }
 
+    fn start_with(&mut self, args: Arguments<'_>) {
+        (**self).start_with(args);
+    }
+
     fn update(&mut self) {
         (**self).update();
     }
@@ -623,6 +655,12 @@ impl<P: ProgressLog> ProgressLog for Option<P> {
         }
     }
 
+    fn start_with(&mut self, args: Arguments<'_>) {
+        if let Some(pl) = self {
+            pl.start_with(args);
+        }
+    }
+
     fn update(&mut self) {
         if let Some(pl) = self {
             pl.update();
@@ -725,6 +763,181 @@ impl<P: ConcurrentProgressLog> ConcurrentProgressLog for Option<P> {
 
     fn dup(&self) -> Self::Duplicated {
         self.as_ref().map(|pl| pl.dup())
+    }
+}
+
+/// A (concurrent) progress logger that does nothing.
+///
+/// This zero-sized type implements [`ProgressLog`] and
+/// [`ConcurrentProgressLog`] with empty methods: since the choice of not
+/// logging is made by the type, and not by a value, code that is generic
+/// over the logger and that receives an instance of this type contains no
+/// logging code at all, independently of the optimizations performed by
+/// the compiler. Note, however, that the arguments of the methods are still
+/// evaluated: for example, a call to [`format!`] in an argument of
+/// [`start`](ProgressLog::start) will still happen, whereas a call to
+/// [`format_args!`] in an argument of
+/// [`start_with`](ProgressLog::start_with) costs nothing.
+///
+/// The macro [`no_logs!`] provides a convenient way to pass an instance of
+/// this type to a function accepting a `&mut impl ProgressLog` or a `&mut
+/// impl ConcurrentProgressLog`. If you need instead to choose at runtime
+/// whether to log, use an [`Option`].
+///
+/// [`count`](ProgressLog::count) always returns zero, and
+/// [`elapsed`](ProgressLog::elapsed) always returns `None`.
+///
+/// # Examples
+///
+/// ```rust
+/// use dsi_progress_logger::prelude::*;
+///
+/// fn count_to(n: usize, pl: &mut impl ProgressLog) {
+///     pl.start_with(format_args!("Counting to {n}..."));
+///     for _ in 0..n {
+///         pl.light_update();
+///     }
+///     pl.done();
+/// }
+///
+/// // No logging code is generated for this call
+/// count_to(100, no_logs![]);
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct NoLogs;
+
+impl ProgressLog for NoLogs {
+    type Concurrent = NoLogs;
+
+    #[inline(always)]
+    fn log(&mut self, _now: Instant) {}
+
+    #[inline(always)]
+    fn log_if(&mut self, _now: Instant) {}
+
+    #[inline(always)]
+    fn add_to_count(&mut self, _count: usize) {}
+
+    #[inline(always)]
+    fn display_memory(&mut self, _display_memory: bool) -> &mut Self {
+        self
+    }
+
+    #[inline(always)]
+    fn item_name(&mut self, _item_name: impl AsRef<str>) -> &mut Self {
+        self
+    }
+
+    #[inline(always)]
+    fn log_interval(&mut self, _log_interval: Duration) -> &mut Self {
+        self
+    }
+
+    #[inline(always)]
+    fn expected_updates(&mut self, _expected_updates: impl Into<Option<usize>>) -> &mut Self {
+        self
+    }
+
+    #[inline(always)]
+    fn time_unit(&mut self, _time_unit: impl Into<Option<TimeUnit>>) -> &mut Self {
+        self
+    }
+
+    #[inline(always)]
+    fn local_speed(&mut self, _local_speed: bool) -> &mut Self {
+        self
+    }
+
+    #[inline(always)]
+    fn log_target(&mut self, _target: impl AsRef<str>) -> &mut Self {
+        self
+    }
+
+    #[inline(always)]
+    fn push_log_target(&mut self, _suffix: impl AsRef<str>) -> &mut Self {
+        self
+    }
+
+    #[inline(always)]
+    fn pop_log_target(&mut self) -> &mut Self {
+        self
+    }
+
+    #[inline(always)]
+    fn log_level(&mut self, _log_level: Level) -> &mut Self {
+        self
+    }
+
+    #[inline(always)]
+    fn start(&mut self, _msg: impl AsRef<str>) {}
+
+    #[inline(always)]
+    fn start_with(&mut self, _args: Arguments<'_>) {}
+
+    #[inline(always)]
+    fn update(&mut self) {}
+
+    #[inline(always)]
+    fn update_with_count(&mut self, _count: usize) {}
+
+    #[inline(always)]
+    fn update_with_count_and_time(&mut self, _count: usize, _now: Instant) {}
+
+    #[inline(always)]
+    fn light_update(&mut self) {}
+
+    #[inline(always)]
+    fn update_and_display(&mut self) {}
+
+    #[inline(always)]
+    fn stop(&mut self) {}
+
+    #[inline(always)]
+    fn done(&mut self) {}
+
+    #[inline(always)]
+    fn done_with_count(&mut self, _count: usize) {}
+
+    #[inline(always)]
+    fn elapsed(&self) -> Option<Duration> {
+        None
+    }
+
+    #[inline(always)]
+    fn count(&self) -> usize {
+        0
+    }
+
+    #[inline(always)]
+    fn refresh(&mut self) {}
+
+    #[inline(always)]
+    fn trace(&self, _args: Arguments<'_>) {}
+
+    #[inline(always)]
+    fn debug(&self, _args: Arguments<'_>) {}
+
+    #[inline(always)]
+    fn info(&self, _args: Arguments<'_>) {}
+
+    #[inline(always)]
+    fn warn(&self, _args: Arguments<'_>) {}
+
+    #[inline(always)]
+    fn error(&self, _args: Arguments<'_>) {}
+
+    #[inline(always)]
+    fn concurrent(&self) -> Self::Concurrent {
+        NoLogs
+    }
+}
+
+impl ConcurrentProgressLog for NoLogs {
+    type Duplicated = NoLogs;
+
+    #[inline(always)]
+    fn dup(&self) -> Self::Duplicated {
+        NoLogs
     }
 }
 
@@ -941,6 +1154,17 @@ macro_rules! progress_logger {
 }
 
 impl ProgressLogger {
+    /// Resets counts and times at the start of an activity.
+    fn reset_times(&mut self) {
+        let now = Instant::now();
+        self.start_time = Some(now);
+        self.stop_time = None;
+        self.count = 0;
+        self.last_count = 0;
+        self.last_log_time = now;
+        self.next_log_time = now + self.log_interval;
+    }
+
     /// Calls to [light_update](ProgressLog::light_update) will cause a call to
     /// [`Instant::now`] only if the current count is a multiple of this mask
     /// plus one.
@@ -969,6 +1193,27 @@ impl ProgressLogger {
 
         Ok(())
     }
+}
+
+/// Returns whether the given value displays as the empty string.
+///
+/// The value is formatted just up to its first nonempty fragment, and
+/// nothing is allocated.
+fn displays_nothing(msg: &impl Display) -> bool {
+    struct Probe;
+
+    impl std::fmt::Write for Probe {
+        fn write_str(&mut self, s: &str) -> Result {
+            // An error stops the formatting at the first nonempty fragment
+            if s.is_empty() {
+                Ok(())
+            } else {
+                Err(std::fmt::Error)
+            }
+        }
+    }
+
+    std::fmt::Write::write_fmt(&mut Probe, format_args!("{msg}")).is_ok()
 }
 
 impl ProgressLog for ProgressLogger {
@@ -1062,15 +1307,17 @@ impl ProgressLog for ProgressLogger {
     }
 
     fn start(&mut self, msg: impl AsRef<str>) {
-        let now = Instant::now();
-        self.start_time = Some(now);
-        self.stop_time = None;
-        self.count = 0;
-        self.last_count = 0;
-        self.last_log_time = now;
-        self.next_log_time = now + self.log_interval;
+        self.reset_times();
         if !msg.as_ref().is_empty() {
             log!(target: &self.log_target, self.log_level, "{}", msg.as_ref());
+        }
+    }
+
+    fn start_with(&mut self, args: Arguments<'_>) {
+        self.reset_times();
+        // The log macro formats the message only if it is displayed
+        if !displays_nothing(&args) {
+            log!(target: &self.log_target, self.log_level, "{}", args);
         }
     }
 
@@ -1619,6 +1866,11 @@ impl<P: ProgressLog + Clone + Send> ProgressLog for ConcurrentWrapper<P> {
         self.local_count = 0;
     }
 
+    fn start_with(&mut self, args: Arguments<'_>) {
+        self.inner.lock().unwrap().start_with(args);
+        self.local_count = 0;
+    }
+
     #[inline]
     fn update(&mut self) {
         self.update_with_count(1)
@@ -1726,6 +1978,29 @@ impl<P: ProgressLog + Display> Display for ConcurrentWrapper<P> {
 
 /// Convenience macro specifying that no (concurrent) logging should be
 /// performed.
+///
+/// The macro expands to a mutable reference to an instance of [`NoLogs`],
+/// which can be passed to any function accepting a `&mut impl ProgressLog`
+/// or a `&mut impl ConcurrentProgressLog`: no logging code will be generated
+/// for the call.
+#[macro_export]
+macro_rules! no_logs {
+    () => {
+        &mut $crate::NoLogs
+    };
+}
+
+/// Convenience macro specifying that no (concurrent) logging should be
+/// performed, using an [`Option`].
+///
+/// This macro expands to a mutable reference to a `None` variant: every
+/// method call will perform a runtime check, unless the compiler is able to
+/// propagate the variant through the code, and the logging code will be
+/// generated anyway. Please use [`no_logs!`] instead.
+#[deprecated(
+    since = "0.8.11",
+    note = "use no_logs!, which guarantees that no logging code is generated"
+)]
 #[macro_export]
 macro_rules! no_logging {
     () => {
@@ -1736,9 +2011,11 @@ macro_rules! no_logging {
 pub mod prelude {
     pub use log::Level;
 
+    #[allow(deprecated)]
+    pub use super::no_logging;
     pub use super::{
-        ConcurrentProgressLog, ConcurrentWrapper, ProgressLog, ProgressLogger, TimeUnit,
-        concurrent_progress_logger, no_logging, progress_logger,
+        ConcurrentProgressLog, ConcurrentWrapper, NoLogs, ProgressLog, ProgressLogger, TimeUnit,
+        concurrent_progress_logger, no_logs, progress_logger,
     };
 }
 
@@ -2010,6 +2287,83 @@ mod tests {
     }
 
     #[test]
+    fn test_no_logs() {
+        assert_eq!(std::mem::size_of::<NoLogs>(), 0);
+        fn run(pl: &mut impl ConcurrentProgressLog) {
+            pl.item_name("item").expected_updates(10);
+            // Must not be formatted
+            pl.start("Starting...");
+            pl.start_with(format_args!("{}", Unprintable));
+            pl.update();
+            pl.update_with_count(10);
+            pl.light_update();
+            let mut clone = pl.clone();
+            clone.update();
+            pl.dup().update();
+            pl.concurrent().update();
+            pl.info(format_args!("{}", Unprintable));
+            pl.done();
+            assert_eq!(pl.count(), 0);
+            assert!(pl.elapsed().is_none());
+        }
+        run(no_logs![]);
+    }
+
+    /// A value that cannot be displayed.
+    struct Unprintable;
+
+    impl Display for Unprintable {
+        fn fmt(&self, _f: &mut Formatter<'_>) -> Result {
+            panic!("this value must not be formatted")
+        }
+    }
+
+    #[test]
+    fn test_displays_nothing() {
+        assert!(displays_nothing(&""));
+        assert!(displays_nothing(&String::new()));
+        assert!(displays_nothing(&format_args!("")));
+        assert!(displays_nothing(&format_args!("{}{}", "", "")));
+        assert!(!displays_nothing(&"a"));
+        assert!(!displays_nothing(&format_args!("{}", 0)));
+        // Formatting stops at the first nonempty fragment
+        assert!(!displays_nothing(&format_args!("a{}", Unprintable)));
+    }
+
+    #[test]
+    fn test_start_messages() {
+        // Strings, owned strings, and lazily formatted messages
+        let mut pl = ProgressLogger::default();
+        pl.start("");
+        pl.start("Starting...");
+        pl.start(format!("Starting {}...", 1));
+        pl.start_with(format_args!(""));
+        pl.start_with(format_args!("Starting {}...", 2));
+        assert!(pl.elapsed().is_some());
+        let mut cpl = pl.concurrent();
+        cpl.start_with(format_args!("Starting {}...", 3));
+        // Through the implementation for mutable references
+        fn start(mut pl: impl ProgressLog) {
+            pl.start_with(format_args!("Starting {}...", 4));
+        }
+        start(&mut cpl);
+        let mut opt = Some(pl);
+        opt.start_with(format_args!("Starting {}...", 5));
+        // Nothing is formatted without a logger
+        Option::<ProgressLogger>::None.start_with(format_args!("{}", Unprintable));
+        // Nothing is formatted if the log level is disabled (no logger is
+        // installed in unit tests)
+        let mut pl = ProgressLogger::default();
+        pl.start_with(format_args!("Starting{}", Unprintable));
+        // The default implementation formats the message and calls start
+        let mut mock = MockLog::default();
+        mock.add_to_count(5);
+        mock.start_with(format_args!("Starting {}...", 6));
+        assert_eq!(mock.count(), 0);
+    }
+
+    #[test]
+    #[allow(deprecated)]
     fn test_option_none_is_noop() {
         let pl = no_logging![];
         pl.update();

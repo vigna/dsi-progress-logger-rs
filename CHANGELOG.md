@@ -1,5 +1,30 @@
 # Change Log
 
+## [0.8.11] - unreleased
+
+### New
+
+- New zero-sized type `NoLogs` implementing `ProgressLog` and
+  `ConcurrentProgressLog` with empty methods, and new macro `no_logs!`
+  passing an instance of it. Since the choice of not logging is made by the
+  type, code that is generic over the logger contains no logging code when
+  it receives a `NoLogs`, independently of compiler optimizations.
+
+- New method `ProgressLog::start_with`, which works like `start` but
+  accepts the result of `format_args!`: the implementations of this crate
+  format the message only if it is actually displayed, whereas
+  `pl.start(format!(...))` allocates and formats a string even when logging
+  is disabled. The method has a default implementation that formats the
+  message and calls `start`.
+
+### Changed
+
+- The macro `no_logging!` is deprecated in favor of `no_logs!`: it passes
+  an `Option::None`, so the logging code is generated anyway, and every
+  method call performs a runtime check unless the compiler is able to
+  propagate the variant, which does not happen in general (e.g., through
+  non-inlined functions or closures run by a thread pool).
+
 ## [0.8.10] - 2026-10-26
 
 ### Fixed
